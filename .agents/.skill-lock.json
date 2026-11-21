@@ -1,25 +1,6 @@
 {
   "version": 3,
   "skills": {
-    "codex-code-review": {
-      "source": "smithery.ai",
-      "sourceType": "well-known",
-      "sourceUrl": "https://smithery.ai/skills/tyrchen/codex-code-review/.well-known/skills/codex-code-review/SKILL.md",
-      "skillFolderHash": "",
-      "sourceBaseUrl": "https://smithery.ai/skills/tyrchen/codex-code-review",
-      "wellKnownDigest": "sha256:32dcd0f1bbe3ceef85fae36d17d96ba3912e20e376f67ff2cf40cce49e338ab9",
-      "installedAt": "2026-08-25T02:30:42.886Z",
-      "updatedAt": "2026-08-25T02:30:42.886Z"
-    },
-    "find-skills": {
-      "source": "vercel-labs/skills",
-      "sourceType": "github",
-      "sourceUrl": "https://github.com/vercel-labs/skills.git",
-      "skillPath": "skills/find-skills/SKILL.md",
-      "skillFolderHash": "76a98a285cb0434f3d39e1a873823556330e398b",
-      "installedAt": "2026-08-25T02:30:54.269Z",
-      "updatedAt": "2026-08-25T02:30:54.269Z"
-    },
     "openspec-propose": {
       "source": "Fission-AI/OpenSpec",
       "sourceType": "github",
