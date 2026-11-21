@@ -1,0 +1,87 @@
+{
+  "version": 3,
+  "skills": {
+    "codex-code-review": {
+      "source": "smithery.ai",
+      "sourceType": "well-known",
+      "sourceUrl": "https://smithery.ai/skills/tyrchen/codex-code-review/.well-known/skills/codex-code-review/SKILL.md",
+      "skillFolderHash": "",
+      "sourceBaseUrl": "https://smithery.ai/skills/tyrchen/codex-code-review",
+      "wellKnownDigest": "sha256:32dcd0f1bbe3ceef85fae36d17d96ba3912e20e376f67ff2cf40cce49e338ab9",
+      "installedAt": "2026-08-25T02:30:42.886Z",
+      "updatedAt": "2026-08-25T02:30:42.886Z"
+    },
+    "find-skills": {
+      "source": "vercel-labs/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/vercel-labs/skills.git",
+      "skillPath": "skills/find-skills/SKILL.md",
+      "skillFolderHash": "76a98a285cb0434f3d39e1a873823556330e398b",
+      "installedAt": "2026-08-25T02:30:54.269Z",
+      "updatedAt": "2026-08-25T02:30:54.269Z"
+    },
+    "openspec-propose": {
+      "source": "Fission-AI/OpenSpec",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/Fission-AI/OpenSpec.git",
+      "ref": "v2.1.1",
+      "skillPath": "skills/openspec-propose/SKILL.md",
+      "skillFolderHash": "3cf4ecb86a0d1d812657801ad0e0a18911a46d10",
+      "installedAt": "2026-11-21T05:29:32.790Z",
+      "updatedAt": "2026-11-21T05:29:32.790Z"
+    },
+    "openspec-archive-change": {
+      "source": "Fission-AI/OpenSpec",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/Fission-AI/OpenSpec.git",
+      "ref": "v2.1.1",
+      "skillPath": "skills/openspec-archive-change/SKILL.md",
+      "skillFolderHash": "b936998a7f9b28d2e99e8ee9be55187214abe1af",
+      "installedAt": "2026-11-21T05:29:32.790Z",
+      "updatedAt": "2026-11-21T05:29:32.790Z"
+    },
+    "openspec-sync-specs": {
+      "source": "Fission-AI/OpenSpec",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/Fission-AI/OpenSpec.git",
+      "ref": "v2.1.1",
+      "skillPath": "skills/openspec-sync-specs/SKILL.md",
+      "skillFolderHash": "c2852ab2485c68472a30fe5130d59ffc04523af3",
+      "installedAt": "2026-11-21T05:29:32.790Z",
+      "updatedAt": "2026-11-21T05:29:32.790Z"
+    },
+    "openspec-update-change": {
+      "source": "Fission-AI/OpenSpec",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/Fission-AI/OpenSpec.git",
+      "ref": "v2.1.1",
+      "skillPath": "skills/openspec-update-change/SKILL.md",
+      "skillFolderHash": "8e8250f626b3a1b04f0c0dc0f6f6b91d64168007",
+      "installedAt": "2026-11-21T05:29:32.790Z",
+      "updatedAt": "2026-11-21T05:29:32.790Z"
+    },
+    "openspec-apply-change": {
+      "source": "Fission-AI/OpenSpec",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/Fission-AI/OpenSpec.git",
+      "ref": "v2.1.1",
+      "skillPath": "skills/openspec-apply-change/SKILL.md",
+      "skillFolderHash": "bde866776c55fa1f9e7472c767f7f26ba31fbb57",
+      "installedAt": "2026-11-21T05:29:32.790Z",
+      "updatedAt": "2026-11-21T05:29:32.790Z"
+    },
+    "openspec-explore": {
+      "source": "Fission-AI/OpenSpec",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/Fission-AI/OpenSpec.git",
+      "ref": "v2.1.1",
+      "skillPath": "skills/openspec-explore/SKILL.md",
+      "skillFolderHash": "e28ef0a32fff065a6f4f18e6e8d2fa3109d33eed",
+      "installedAt": "2026-11-21T05:29:32.790Z",
+      "updatedAt": "2026-11-21T05:29:32.790Z"
+    }
+  },
+  "dismissed": {
+    "findSkillsPrompt": true
+  }
+}
