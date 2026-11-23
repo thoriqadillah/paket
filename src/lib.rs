@@ -1,1 +1,1 @@
-//! Paket core library.
+pub mod core;
