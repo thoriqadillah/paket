@@ -1,6 +1,6 @@
 # Paket — Repository Baseline
 
-Recorded during S01. This is a factual snapshot, not a progress log.
+Recorded during S001. This is a factual snapshot, not a progress log.
 
 ## Repository layout (as found)
 
@@ -16,13 +16,13 @@ openspec/specs/.gitkeep
 - No `Cargo.toml`, `src/`, `tests/`, or `scripts/` directory exists yet.
 - No CI configuration (`.github/`, `.gitlab-ci.yml`, etc.).
 - No existing Rust code, so there is no overlap with the plan to reconcile.
-- The repository is effectively greenfield for S02.
+- The repository is effectively greenfield for S004.
 
 ### Git state at baseline
 
 - Branch: `master`
 - Recent commits: `2e21300 skills`, `634943f openspec`
-- Pre-existing changes (unrelated to S01, left untouched):
+- Pre-existing changes (unrelated to S001, left untouched):
   - staged: `.agents/.skill-lock.json` modified
   - staged-then-deleted: `openspec/research.md` (`AD`)
   - untracked: `docs/`
@@ -34,7 +34,7 @@ openspec/specs/.gitkeep
 - `rustup` 1.29.0 (28d1352db 2026-03-05)
 - Active default toolchain: `stable-x86_64-unknown-linux-gnu`
 - Installed toolchains: `1.97-x86_64-unknown-linux-gnu`, `1.99.1-x86_64-unknown-linux-gnu`
-- Rust 1.97 supports edition 2024, so the edition chosen in S02 is available.
+- Rust 1.97 supports edition 2024, so the edition chosen in S004 is available.
 
 ### Host
 
@@ -55,7 +55,7 @@ All three are present. No package operations were performed.
 
 ### Baseline validation
 
-No `Cargo.toml` exists yet, so Rust validation is not applicable at S01:
+No `Cargo.toml` exists yet, so Rust validation is not applicable at S001:
 
 - `cargo check --all-targets` → `error: could not find Cargo.toml in ... or any parent directory`
 - `cargo fmt --check` → `cargo metadata` failed: could not find `Cargo.toml`
@@ -63,4 +63,4 @@ No `Cargo.toml` exists yet, so Rust validation is not applicable at S01:
 
 ### Blockers
 
-None for S01. The next task, S02, can create the Cargo package on this host.
+None for S001. A later task can create the Cargo package on this host.

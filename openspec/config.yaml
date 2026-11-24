@@ -2,9 +2,9 @@ schema: spec-driven
 
 context: |
   Paket is a Linux package-manager GUI in Rust + Slint. The implementation plan is docs/plan.md.
-  OpenSpec is the only progress tracker: one change per plan stage/task pack, its tasks.md mirrors
-  that stage's Sxx tasks, and a task is checked only when its DoD passes. Implement only one
-  unchecked Sxx task per agent run; do not continue to the next task. Archive a change when its
+  OpenSpec is the only progress tracker: one change per plan stage (A–N), its tasks.md mirrors
+  that stage's Sxxx tasks, and a task is checked only when its DoD passes. Implement only one
+  unchecked Sxxx task per agent run; do not continue to the next task. Archive a change when its
   tasks are done; gates control when the next stage starts. Never commit. Record host/tool
   mismatches in docs/deviations.md.
 

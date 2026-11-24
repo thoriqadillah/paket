@@ -1,2103 +1,3612 @@
-# Paket — Incremental Implementation Plan
+# Paket — Production Implementation Plan
 
 > **Execution plan for a small-context coding agent.**
 >
-> Backend first. GUI only after the first backend contract is stable.
+> Product goal: one Linux desktop application for discovering and managing software from
+> native distribution repositories, Flatpak, Snap, AUR, and locally managed AppImages.
 >
-> **This is not a “build the whole application” prompt.** Every `Sxx` item is one
-> independently executable task. The agent must implement exactly one item per run,
-> validate it, report the result, and stop. Do not ask the agent to execute an entire
-> stage or milestone in one go.
+> **This is not a one-shot implementation prompt. One agent run = exactly one `Sxxx`
+> task.** Each task is independently reviewable, has a narrow file scope, and ends with
+> explicit validation. Complete the tasks in order unless a prerequisite says otherwise.
+>
+> Research snapshot: 2026-11-23. Re-check pinned upstream documentation when a backend
+> task starts; package-manager CLI and D-Bus interfaces can change between distro releases.
 
 ---
 
 ## 0. How to execute this plan
 
-### 0.1 The most important rule
+### 0.1 One task per agent run
 
-**One agent run = one `Sxx` task.**
+Give the coding agent exactly one task, for example `S023`, plus the architecture sections
+referenced by that task. Do not ask it to implement a whole stage, milestone, backend, or
+“everything until the UI”. Review the result before assigning the next task.
 
-An OpenSpec change covers a whole stage; an agent run still implements only one unchecked
-`Sxx` task from it. Do not loop through the change's remaining tasks.
+An OpenSpec change covers one stage; a run still implements only one unchecked `Sxxx` task
+from it. Do not loop through the change's remaining tasks.
 
-For example, when assigning `S14`, give the agent only `S14` plus the architecture
-sections it needs. Do not ask it to “continue with the next steps” after it finishes.
-The human reviews the result, then starts a new run for `S15`.
+Target 30–90 minutes of focused agent work per task. Most tasks should touch one small
+production module, its corresponding tests, and at most one fixture file. If a task appears
+larger in the actual repository, the agent must stop and propose a split rather than
+silently widening scope.
 
-A task should normally touch no more than:
+### 0.2 Required workflow for every task
 
-- one production module or a small pair of directly related modules;
-- the matching unit/integration test file;
-- the fixture files required by those tests.
+1. Read the task, its prerequisites, the relevant architecture sections, and the active
+   OpenSpec change for the stage.
+2. Inspect the current repository. Never assume the previous task was implemented exactly
+   as planned.
+3. Implement only the assigned task. Do not start the next task or perform opportunistic
+   refactors.
+4. Add tests for the behavior introduced in this task.
+5. Run the exact task validation, then `cargo fmt --check` and the narrowest relevant
+   `cargo test` command. Run `cargo clippy --all-targets -- -D warnings` at the gates.
+6. Do not weaken, skip, delete, or silence tests to obtain a passing result.
+7. Mark only this `Sxxx` complete in the change's `tasks.md`. Stop and report: summary,
+   files changed, validation evidence, known limitations, deviations, and whether the DoD
+   passed. Do not start the next task and do not archive the change.
 
-If the agent discovers that a task needs a wider refactor, it must stop and report the
-blocker. It must not silently expand the task.
+### 0.3 Standard prompts for the local agent
 
-### 0.2 Required agent workflow
+Change names are listed in `AGENTS.md`. Use the propose prompt once per stage, then the
+apply prompt once per task.
 
-For every `Sxx` task, the agent must:
-
-1. Read the task's goal, allowed files, implementation notes, tests and DoD from this
-   plan, plus the active OpenSpec change for the stage.
-2. Inspect the existing code before editing. Do not assume the repository is empty or
-   that the previous task was implemented exactly as expected.
-3. Implement only the requested scope. Do not implement the next step “while already
-   here”.
-4. Add or update tests for the behavior changed in this step.
-5. Run the exact validation commands listed in the task. Also run `cargo fmt --check`
-   and the narrowest relevant `cargo test` target.
-6. Fix failures introduced by this task. Do not suppress, skip, weaken or delete tests
-   to obtain a green result.
-7. Mark only this `Sxx` complete in the change's `tasks.md`. Stop. Report: files changed,
-   behavior added, validation output, known limitations, and whether the DoD passed. Do not
-   begin another step and do not archive the change.
-
-### 0.3 Standard agent prompt
-
-Copy this prompt and replace `Sxx` with the task being assigned:
+**Propose a stage change**
 
 ```text
-Implement exactly one unchecked Sxx task from the active OpenSpec change for <stage>.
-
-Context:
-- docs/plan.md is the plan; the change's tasks.md mirrors this stage's Sxx tasks.
-- Read the task and its prerequisites before coding.
-- Inspect the existing repository and adapt to its actual state.
+Use the openspec-propose skill to create the OpenSpec change `<change-name>` for
+<stage name> from docs/plan.md.
 
 Rules:
-- Implement only Sxx. Do not implement later tasks or opportunistic refactors.
-- Keep the diff small. Prefer the simplest implementation that satisfies the DoD.
-- Do not add dependencies unless Sxx explicitly requires one. Explain any necessary
-  dependency in the final report.
-- Never use shell command construction (`sh -c`, `bash -c`, etc.). Use argv arrays.
-- Do not invent behavior for a backend. Preserve unsupported/unknown states explicitly.
-- Add tests for the behavior in Sxx. Do not modify fixtures to hide parser failures.
-- Run the task's validation commands, `cargo fmt --check`, and relevant tests.
-- If prerequisites are missing or the task cannot fit its stated scope, stop and report
-  the blocker instead of broadening the change.
-- Mark only this Sxx complete in the change's tasks.md when the DoD passes.
-- Stop after Sxx and provide a concise implementation report. Do not continue to the next
-  task and do not archive the change.
+- Read the matching plan section, its prerequisites and referenced architecture first.
+- Derive scope only from docs/plan.md. Do not invent requirements or include later stages.
+- Cover exactly this stage's tasks: `<Sxxx–Sxxx>`.
+- In tasks.md, mirror each plan task with its ID and verification. Mark a task complete
+  only if the current repository already satisfies its DoD.
+- Do not edit implementation code. Stop after the planning artifacts are written.
 ```
 
-### 0.4 Task sizing rule
+**Apply one task**
 
-Target **30–120 minutes of focused agent work** per task. This is a scope limit, not a
-promise about elapsed time. If a task is likely to exceed that limit, split it before
-execution into smaller tasks. Do not merge adjacent tasks just because they are related.
+```text
+Use the openspec-apply-change skill on the OpenSpec change `<change-name>`.
+Implement only task `<Sxxx>`, the next unchecked task in that change.
 
-A task is not complete merely because the code compiles. It is complete only when its
-DoD passes and the evidence is recorded.
+Context:
+- docs/plan.md is the plan; the change's tasks.md mirrors this stage's Sxxx tasks.
+- Read the task, prerequisites, and referenced architecture sections first.
+- Inspect the actual repository before editing.
 
-### 0.5 Progress tracking
+Rules:
+- Verify the task's prerequisites and that it is the next unchecked task. If not, stop and
+  report the ordering problem.
+- Implement only `<Sxxx>`. Do not implement later tasks or broad refactors.
+- Keep the diff small and follow the task's Allowed files list.
+- Do not add dependencies unless the task explicitly allows them. Explain any addition.
+- Never construct shell commands. Invoke a fixed executable with an argv array.
+- Never turn a package display name into a mutation target. Use validated native IDs.
+- Never disable signature checks, auto-trust a repository key, or run a package build as root.
+- Add behavior-focused tests and preserve unknown/unsupported states explicitly.
+- Run the task validations, cargo fmt --check, and the relevant tests.
+- Mark only `<Sxxx>` complete in the change's tasks.md when the DoD passes.
+- If the scope does not fit, stop and report the blocker instead of widening it.
+- Do not commit. Stop after `<Sxxx>`; do not continue and do not archive the change.
+```
+
+### 0.4 Progress, commits, and deviations
 
 Progress is tracked only in OpenSpec. Do not create or maintain a hand-written progress
 file.
 
-- One OpenSpec change covers one stage or task pack. `AGENTS.md` lists the change names.
-- The change's `tasks.md` mirrors that stage's `Sxx` tasks from this plan.
-- Check off an `Sxx` task only when its DoD passes.
+- One OpenSpec change covers one stage. `AGENTS.md` lists the change names.
+- The change's `tasks.md` mirrors that stage's `Sxxx` tasks from this plan.
+- Check off an `Sxxx` task only when its DoD passes.
 - When every task in the change is done, sync specs and archive the change with the
   OpenSpec workflow. Gates still control when the next stage may start.
 - If `tasks.md` and this plan disagree, this plan wins.
 
-Record factual mismatches between this plan and the actual host/tool output in
-`docs/deviations.md`. That file is not a progress tracker.
+Record factual differences between this plan and the host/upstream tool behavior in
+`docs/deviations.md`. A deviation is not permission to redesign unrelated architecture.
 
-### 0.6 Commit policy
+Prefer one commit per completed task, matching the human's repository workflow. Suggested
+message: `S023: stream child process output`. Do not commit unless the user asks.
 
-Do not commit automatically. I will do it myself
+### 0.5 Gates
 
-### 0.7 Gates
-
-| Gate | Required completed tasks | What becomes possible |
+| Gate | Required tasks | Result |
 |---|---|---|
-| G0 — Project builds | S01–S06 | Shared basic domain and error types |
-| G1 — Command layer works | S07–S12 | Safe, testable process execution and host probing |
-| G2 — DNF catalog works | S13–S21 | Read installed packages, search and updates on Fedora |
-| G3 — DNF mutations work | S22–S34 | Reviewable DNF plans and privileged install/remove |
-| G4 — Initial backend set stable | S35–S45 | DNF + Flatpak usable through a stable backend API |
-| G5 — UI MVP | S46–S54 | Browse, search, review, install/remove and see progress in Slint |
-| G6 — Additional providers | S55 onward | Add APT, Pacman, AUR, Snap and AppImage incrementally |
+| G0 | S001–S012 | Stable product decisions, toolchain, and domain contracts |
+| G1 | S013–S026 | Tokio runtime, safe subprocess layer, bounded event delivery, shutdown |
+| G2 | S027–S039 | Batch intent model, transaction queue, serialization, and recovery rules |
+| G3 | S040–S048 | Host detection and provider capability registry |
+| G4 | S049–S060 | DNF5 provider with supported read and mutation paths |
+| G5 | S061–S071 | Flatpak provider |
+| G6 | S072–S078 | Typed privileged-helper foundation |
+| G7 | S079–S090 | APT provider |
+| G8 | S091–S107 | Pacman and opt-in AUR provider |
+| G9 | S108–S119 | Zypper and rpm-ostree providers |
+| G10 | S120–S131 | Snap and managed AppImage providers |
+| G11 | S132–S144 | Unified catalog, AppStream enrichment, persistence, cache, history |
+| G12 | S145–S160 | Production UI workflows in Slint + Slint Kit |
+| G13 | S161–S167 | Security, integration qualification, packaging, release readiness |
 
-**Do not start a task whose listed prerequisites are incomplete.**
+**A gate is not a prompt.** It is a review checkpoint. Do not ask the agent to implement a
+gate in one run.
 
 ---
 
-## 1. Product decisions (locked for the initial implementation)
+## 1. Product scope and production definition
 
-These decisions prevent the agent from inventing architecture while implementing small
-tasks. Revisit a decision only through an explicit design change, not as part of an
-ordinary implementation step.
+### 1.1 Product objective
 
-| ID | Decision | Reason |
+Paket is a **local package-management client**, not a new package manager. It discovers
+native package-management systems on the host and presents their capabilities in one GUI.
+It delegates dependency solving, package verification, file ownership, installation,
+removal, and update semantics to the official tool/API for each ecosystem.
+
+The common UX may unify:
+
+- application discovery and search;
+- installed software and available updates;
+- package/application details;
+- a reviewable pending-change basket;
+- transaction progress, results, and history;
+- a consistent view of which backend/source owns each candidate.
+
+The common UX must **not** erase ecosystem-specific semantics such as installation scope,
+repository identity, package architecture, dependency effects, full-upgrade requirements,
+reboot-required deployments, runtime/app distinctions, or AUR build trust.
+
+### 1.2 Production support policy
+
+“Linux support” must never be inferred from `/etc/os-release` alone. A backend is enabled only
+when the host family/version is in the tested support matrix **and** its native tool/service
+is present at a supported version.
+
+Use these provider families as the initial production target:
+
+| Ecosystem | Provider | Important boundary |
 |---|---|---|
-| D1 | Rust, one Cargo package, one library and separate binaries | Avoid workspace complexity in the first version. |
-| D2 | Fedora Workstation with DNF5 is the first host target | One known host makes backend behavior testable. |
-| D3 | Flatpak is the second backend | It adds a distinct package ecosystem without adding another root helper. |
-| D4 | Other backends are separate later task groups | APT, Pacman, AUR, Snap and AppImage must not delay the first working vertical slice. |
-| D5 | Use official native package-manager CLIs | Do not reimplement dependency resolution or transaction semantics. |
-| D6 | No async runtime initially | Blocking process I/O runs on a worker thread; UI remains responsive through channels. |
-| D7 | Never invoke a shell | Spawn programs with a fixed executable and argument vector. |
-| D8 | Core uses opaque `PkgId`; backend owns native ID parsing | Prevents the UI/core from accidentally targeting a different package. |
-| D9 | Capabilities are explicit | Unsupported operations are disabled/reported, never silently treated as successful. |
-| D10 | DNF/APT/Pacman privileged writes use a narrow helper | The helper accepts typed operations, never arbitrary commands or argv. |
-| D11 | Flatpak and Snap use their own polkit flow | Do not wrap their normal client commands in Paket's root helper. |
-| D12 | AUR builds run as the logged-in user, never root | AUR build scripts are untrusted code. |
-| D13 | AppImage is a local-file manager, not a repository backend | It has no native package solver or central repository. |
-| D14 | Slint + Slint Kit UI comes after G4 | UI must consume a stable backend contract. |
-| D15 | Pin Slint `1.19.0` and Slint Kit `0.9.0` when UI work starts | The prior research identified the Kit as pre-1.0 with possible breaking changes. |
+| Fedora/RPM family | DNF5 | DNF5 is the provider; raw RPM queries alone are not an installer |
+| RHEL-compatible systems with DNF4 | Future DNF4 adapter | Not enabled in the first production matrix; requires a separate task pack and VM qualification. Never reuse DNF5 parsers. |
+| openSUSE/SUSE RPM | Zypper | Separate resolver and repository semantics |
+| Fedora Atomic / rpm-ostree hosts | rpm-ostree | Separate deployment/layering model; operations may require reboot |
+| Debian/Ubuntu | APT + dpkg-query | Use APT for solving; do not use raw `dpkg -i` as the normal install path |
+| Arch Linux | pacman/libalpm-facing adapter | Package install must respect full-system-upgrade semantics |
+| Arch User Repository | AUR (separate provider) | Untrusted build scripts; explicit review and user build process |
+| Cross-distro application layer | Flatpak | Track user/system installation and full ref identity |
+| Snap | snapd / Snap CLI | Optional; available only when snapd is present and healthy |
+| Standalone binaries | Managed AppImage | Local file management, not a repository/package solver |
 
-### 1.1 Initial supported scope
+For the first supported production release, publish a precise matrix of tested distro
+versions and architectures. A reasonable initial matrix to qualify is Fedora Workstation
+(DNF5), Ubuntu LTS and Debian stable (APT), Arch Linux (pacman; AUR opt-in), openSUSE
+(Zypper), Flatpak on those hosts, and Snap only where snapd is installed. rpm-ostree is a
+separate supported provider, not a DNF mode. Expand the exact distro/version list only
+when VM qualification passes.
 
-**First usable slice:** Fedora Workstation (non-Atomic) + DNF5 + Flatpak.
+Do not claim that every distro in an OS family is supported merely because it shares RPM,
+DEB, or pacman packages. Include a visible “detected but not qualified” state.
 
-The application must be useful before any optional backend exists. On a Fedora host:
+### 1.3 Production-ready means
 
-- DNF5 can list installed packages, search available packages, show updates, plan an
-  install/remove and apply approved operations.
-- Flatpak can list installed applications/runtimes, search, and later install/remove
-  using Flatpak's own authorization flow.
-- A missing Flatpak installation does not prevent DNF from working.
-- A missing DNF5 installation does not prevent the application from starting; the
-  provider reports why it is unavailable.
+A release is production-ready only when all of these are true:
 
-### 1.2 Explicit non-goals for the first usable slice
+1. Every advertised backend has fixture-backed parsers, command/API contract tests, and
+   successful/failed transaction tests on disposable VMs.
+2. Package identities remain unique across backend, source, architecture, branch, and
+   installation scope.
+3. A transaction is reviewed before mutation; the actual native solver remains the source
+   of truth; changed/stale plans require re-review.
+4. One mutation coordinator prevents Paket from starting overlapping system writes.
+5. External package-manager locks are handled without deleting lock files or bypassing
+   native lock protection.
+6. AUR and local file operations are treated as untrusted input.
+7. Crashes/restarts never cause Paket to replay a write automatically or claim a result it
+   cannot prove.
+8. Logs, caches, and UI event streams are bounded and do not expose credentials.
+9. Keyboard navigation, focus, screen-reader labels, scaling, translations, and common
+   failure dialogs are tested.
+10. Installation packages, helper ownership/permissions, signatures, upgrades, and
+    uninstall paths are verified on clean VMs.
 
-Do not implement these until their dedicated tasks are reached:
+### 1.4 Explicit non-goals
 
-- APT/DEB, Pacman/AUR, Snap or AppImage.
-- Application grouping/deduplication with AppStream.
-- Repository/source editing, key import or trust management.
-- Automatic updates, rollback, snapshots or history restoration.
-- A daemon, remote management, multi-user management or plugin ABI.
-- A custom dependency solver or cross-ecosystem atomic transaction.
-- Settings screens, themes, telemetry, auto-update service or advanced activity UI.
+Do not implement:
+
+- a custom dependency solver, downloader, repository format, or package database;
+- cross-ecosystem atomic transactions or an undo button that promises rollback;
+- automatic system updates or background installs without user consent;
+- arbitrary shell execution, arbitrary privileged argv, or user-defined root scripts;
+- repository key import or “trust this key” automation;
+- a dynamic third-party plugin ABI in the first production line;
+- remote host administration, multi-user administration, or server mode;
+- Nix/Guix support until the provider contract is stable;
+- automatic removal of user data, Flatpak app data, orphan packages, or AUR build files.
 
 ---
 
-## 2. Architecture (small initial shape)
+## 2. Locked technical decisions
+
+| ID | Decision | Reason / qualification |
+|---|---|---|
+| D1 | Project name and binaries are `paket` / `paket-helper` | All Cargo targets, desktop IDs, docs, logs, package names and paths use Paket |
+| D2 | Rust 2024 edition | Stable language baseline |
+| D3 | Pin Slint `1.19.0` and Slint Kit `0.9.0` when UI work begins | Current research snapshot; do not follow floating latest versions |
+| D4 | Rust toolchain minimum is `1.95` while using Slint Kit `0.9.0` | Slint Kit currently declares Rust 1.95+ and Slint 1.19.0 |
+| D5 | Slint Kit adoption is gated by license review | The base kit is GPL-3.0-or-later; choose a compatible Paket license or do not ship Kit components |
+| D6 | Use Tokio `1.54.1` with minimal explicit features | It fits async subprocesses, queues, timeouts, and bounded concurrency |
+| D7 | Tokio runs on a dedicated multi-thread runtime, separate from Slint's event loop | Slint documents that its event loop does not drive Tokio futures reliably |
+| D8 | Do not wrap the Slint event loop in `#[tokio::main]` | Avoid runtime/event-loop coupling and accidental main-thread blocking |
+| D9 | Native package tools/services own dependency resolution and transaction semantics | Paket only adapts, validates, displays, and schedules them |
+| D10 | Never invoke a shell | Fixed executable + `OsString` argv; no `sh -c`, `bash -c`, or interpolated command string |
+| D11 | Mutations run through one global FIFO coordinator initially | Multiple clicks enqueue intent; they do not start competing package transactions |
+| D12 | Group same-backend/same-scope intents into one native transaction | One resolver pass is better than one process per clicked package |
+| D13 | Cross-backend batches are sequential and non-atomic | Show partial success explicitly; never promise all-or-nothing across ecosystems |
+| D14 | Read-only discovery can run concurrently with a strict bound | Keep UI responsive without unlimited subprocesses or network calls |
+| D15 | System privilege uses native authorization or a narrow typed helper | DNF5 daemon/polkit, Flatpak's own system helper, snapd, or Paket helper as appropriate |
+| D16 | AUR builds always run as the logged-in user | Never run PKGBUILD code as root |
+| D17 | AppImage is a managed local-file provider | No universal repository or update source exists for every AppImage |
+| D18 | SQLite stores Paket state, not package-manager truth | Installed state and dependency resolution must be refreshed from native providers |
+| D19 | No plugin ABI | A static provider registry keeps security and release compatibility manageable |
+| D20 | Slint UI consumes a stable Rust application-service contract | No package-manager logic in Slint callbacks |
+
+### 2.1 Tokio and Slint integration decision
+
+Use Tokio. Package management is primarily I/O-bound and Paket will coordinate multiple
+long-running child processes, D-Bus calls, network catalog queries, timeouts, cancellation,
+and progress updates. Tokio gives these operations a shared scheduler and async process
+I/O; it does **not** make package transactions safe to run concurrently.
+
+Runtime model:
 
 ```text
-paket (unprivileged desktop app)
-  ├── core/       domain types and use cases
-  ├── backends/   one adapter per package ecosystem
-  ├── exec/       process runner; only place allowed to spawn ordinary commands
-  ├── helper/     client-side protocol for privileged helper
-  └── ui/         Slint bridge, added after backend gate G4
+Main OS thread
+  Slint event loop
+  ├── UI callbacks send AppCommand through bounded channel
+  └── UI updates only happen on this thread
 
-paket-helper (narrow privileged binary)
-  └── accepts typed JSON requests; validates them; constructs fixed native argv
+Dedicated Tokio multi-thread runtime
+  AppCoordinator
+  ├── read scheduler: bounded concurrency (initially 4)
+  ├── mutation coordinator: one active mutation batch globally
+  ├── provider adapters
+  ├── Tokio subprocesses / D-Bus / Snap requests
+  └── bounded event delivery + latest-progress watch
+
+Tokio -> Slint
+  slint::invoke_from_event_loop(move || update_model(...))
 ```
 
-### 2.1 Initial process model
+Do not pass Tokio futures directly to `slint::spawn_local`. Slint's current documentation
+warns that the Slint event loop cannot reliably drive Tokio scheduling. A dedicated Tokio
+runtime plus `slint::invoke_from_event_loop` keeps responsibilities clear.
 
-- One background worker thread owns the core/backend registry.
-- UI thread sends requests over a channel and receives events over another channel.
-- Backend commands are serialized. This is intentionally conservative; package managers
-  lock shared databases and concurrent transactions are undesirable.
-- Read-only commands have a bounded timeout (normally 30 seconds).
-- Install/remove commands have no short fixed timeout; the user can cancel them.
-- The UI never calls a backend directly and never runs package-manager commands.
+Use `tokio::process::Command` for async child I/O. Keep each `Child` handle alive until the
+process is reaped. Never assume dropping a future or child handle cancels a native package
+transaction. Cancellation is an explicit request: stop reading as appropriate, signal the
+child/process group according to the backend policy, await exit/reap, then reconcile state.
 
-### 2.2 Initial crate layout
+### 2.2 Multi-click and batch behavior
 
-Do not create every file in this tree at S01. Add files only when their task is reached.
+The app must support repeated Install/Remove clicks without launching a new package-manager
+process on every click.
+
+Required behavior:
+
+1. A click adds or updates a **draft intent** in the pending-changes basket.
+2. Duplicate identical intents are de-duplicated. Contradictory intents for the same exact
+   package/scope are shown as a conflict that the user must resolve.
+3. On Review, intents are grouped by `(BackendId, InstallationScope)`.
+4. Each group becomes one native transaction plan. The native solver reports dependency,
+   upgrade, removal, and conflict effects where available.
+5. A batch containing more than one backend is an ordered list of independent transaction
+   steps. It is not atomic across backends.
+6. Apply starts one global mutation batch. Additional clicks during execution belong to
+   the next draft; they must not mutate the already-approved batch.
+7. The coordinator runs one transaction step at a time. On failure, stop by default,
+   refresh affected providers, mark later steps as skipped, and require a new review.
+8. After each success, refresh installed state and invalidate the related caches.
+
+This permits many clicks and many selected packages while preserving package-manager locks
+and understandable failure semantics. Later optimization may run operations concurrently
+only when resource locks and provider semantics prove they are independent. Do not add
+parallel mutations in this plan's first production line.
+
+---
+
+## 3. Architecture
+
+### 3.1 Runtime and module layout
+
+Keep one Cargo package with a library and two binaries. Do not split into many crates until
+build isolation or a clear ownership boundary actually requires it.
 
 ```text
 Cargo.toml
-build.rs                         # added when Slint work starts
+Cargo.lock
+rust-toolchain.toml
+build.rs                         # Slint integration, added in UI stage
 src/
   lib.rs
-  main.rs                        # GUI binary, added with UI
+  main.rs                        # creates Tokio runtime, then runs Slint on main thread
   bin/
-    helper.rs                    # privileged helper binary
+    helper.rs                    # typed privileged helper
+  app/
+    mod.rs
+    coordinator.rs                # application commands and service orchestration
+    events.rs                    # typed UI/application events
   core/
     mod.rs
-    model.rs
+    ids.rs
+    package.rs                   # package/app/source identity models
+    capability.rs
+    transaction.rs               # plans, batches, progress and outcomes
     error.rs
     registry.rs
-    service.rs
-    planner.rs
-    executor.rs
-  exec/
+  runtime/
     mod.rs
-    runner.rs
+    runtime.rs                   # runtime construction and shutdown
+    command.rs                   # safe command spec and output types
+    process.rs                   # async process runner
+    events.rs                    # bounded event delivery
+    scheduler.rs                 # read concurrency and mutation queue
   platform/
     mod.rs
     os_release.rs
+    host.rs
+    probe.rs
+    xdg.rs
   backends/
     mod.rs
-    dnf/
-      mod.rs
-      probe.rs
-      parse.rs
-      catalog.rs
-      plan.rs
-      progress.rs
-      error.rs
+    dnf5/                        # CLI catalog + optional/required DNF5 daemon adapter
+    apt/
+    pacman/
+    aur/
+    zypper/
+    rpm_ostree/
     flatpak/
-      mod.rs
-      probe.rs
-      parse.rs
-      catalog.rs
-      transaction.rs
+    snap/
+    appimage/
   helper/
     mod.rs
     protocol.rs
     client.rs
+    validation.rs
+  store/
+    mod.rs
+    db.rs
+    migrations/
+    package_cache.rs
+    history.rs
+    settings.rs
+  catalog/
+    mod.rs
+    search.rs
+    appstream.rs
+    ranking.rs
   ui/
     mod.rs
     bridge.rs
     state.rs
 ui/
   app.slint
-  views/
   components/
+  views/
 tests/
   fixtures/
-  backend_contract.rs
+  support/
+  providers/
+  vm/
 scripts/
-  check.sh
-  test-fedora.sh
+docs/
 ```
 
-### 2.3 Keep interfaces small
+Add each file only when its task is reached. Do not scaffold all directories in S001.
 
-Start with ordinary structs and functions. Add a trait only when there are multiple
-implementations or when a fake implementation is required for tests.
+### 3.2 Provider interfaces (SOLID without framework overengineering)
 
-The intended provider split is:
+Use interface segregation. Do not force every provider to implement every operation.
 
-- `CatalogSource`: read-only operations such as installed/search/details/updates.
-- `Installer`: planning and applying package changes.
-
-The process runner may have a small trait because tests must substitute a fake process
-runner. Do not add a generic plugin framework, async abstraction, dependency injection
-container or event bus.
-
----
-
-## 3. Domain and process contracts
-
-This section defines the minimum behavior later tasks must preserve. Implement the types
-incrementally; do not create all of them in one initial task.
-
-### 3.1 Package identity
-
-A package is identified by `(BackendId, native_id)`, not by display name.
-
-Examples of backend-owned native identity:
-
-- DNF: package name plus architecture and the needed NEVRA discriminator.
-- Flatpak: installation scope plus full application/runtime ref.
-- APT: package name, plus architecture where multiarch matters.
-- Pacman: repository/name for available candidates; package name for installed removal.
-- Snap: snap name and instance key where applicable.
-- AUR: AUR package name.
-- AppImage: canonical path inside Paket's managed directory.
-
-The core treats `native_id` as opaque. A backend must validate and decode it before using
-it in a native command. Never use a display name as a mutation target.
-
-### 3.2 Package model: start small
-
-Minimum fields for the DNF catalog:
+Suggested contracts (adapt names as code evolves):
 
 ```rust
-pub struct Pkg {
-    pub id: PkgId,
-    pub name: String,
-    pub version: Option<String>,
-    pub arch: Option<String>,
-    pub summary: Option<String>,
-    pub source: Option<String>,
-    pub installed: bool,
+#[async_trait::async_trait]
+pub trait CatalogBackend: Send + Sync {
+    fn info(&self) -> BackendInfo;
+    async fn list_installed(&self, scope: &InstallationScope)
+        -> Result<Vec<PackageRecord>, CatalogError>;
+    async fn search(&self, query: &str, scope: &SearchScope)
+        -> Result<Vec<PackageRecord>, CatalogError>;
+    async fn details(&self, id: &PackageId)
+        -> Result<PackageRecord, CatalogError>;
+    async fn updates(&self, scope: &InstallationScope)
+        -> Result<Vec<UpdateRecord>, CatalogError>;
+}
+
+#[async_trait::async_trait]
+pub trait TransactionBackend: Send + Sync {
+    async fn plan(&self, intents: &[ChangeIntent])
+        -> Result<BackendPlan, PlanError>;
+    async fn apply(&self, approved: &BackendPlan, events: EventSink)
+        -> Result<BackendOutcome, OperationError>;
 }
 ```
 
-Add fields such as icon, AppStream ID, license, homepage, installed size and package kind
-only in the task that first needs them. Unknown values stay `None`; never invent metadata.
+Optional narrow interfaces may be added for repository listing, app metadata, local files,
+or update policies. Do not make a giant trait with 30 methods. Do not add a dynamic plugin
+loader, custom async-trait framework, DI container, or custom event bus. The small
+`async-trait` macro used to make the two provider ports object-safe is an implementation
+detail, not a new runtime or provider abstraction.
 
-### 3.3 Backend availability
+The provider registry is assembled statically at startup. A provider can register read-only
+capabilities even when its mutation service/helper is unavailable.
 
-A provider probe returns a descriptor, not a panic:
+### 3.3 Identity model
+
+Never use package display name as identity.
+
+- `BackendId`: Dnf5, Apt, Pacman, Aur, Zypper, RpmOstree, Flatpak, Snap, AppImage. DNF4 is reserved for a later adapter task pack.
+- `InstallationScope`: System, User, NamedInstallation(String), LocalManagedStore(PathKey).
+- `PackageId`: backend + scope + opaque backend-native identifier.
+- `SourceId`: backend-native repository/remote/channel identity.
+- `AppId`: AppStream component ID when available; this is a display/application grouping
+  identity, not an install target.
+
+Examples:
+
+- RPM package: native NEVRA (name, epoch, version, release, architecture) plus repo context
+  where needed to distinguish candidate packages.
+- DEB: package name and architecture; candidate version/source remain separate fields.
+- Pacman: package name and repository for candidates; package name for installed query.
+- Flatpak: installation identity + app/runtime + ID + architecture + branch + remote.
+- Snap: snap name plus channel/revision where applicable.
+- AUR: AUR package base/name; installed binary package identity remains Pacman-owned.
+- AppImage: Paket-managed file record ID + canonical managed path.
+
+Core keeps native IDs opaque. Each provider decodes and validates its own ID immediately
+before command/API calls.
+
+### 3.4 Package versus application
+
+A package is a native installable unit. An application is a user-facing product that may map
+to zero, one, or many package candidates across providers. Never collapse package records
+just because their display names match.
+
+Minimum production models:
 
 ```rust
-pub struct BackendInfo {
-    pub id: BackendId,
-    pub label: String,
-    pub available: bool,
-    pub version: Option<String>,
-    pub reason_unavailable: Option<String>,
-    pub capabilities: Vec<Capability>,
+struct PackageRecord {
+    id: PackageId,
+    name: String,
+    version: Option<String>,          // opaque display string; not globally comparable
+    architecture: Option<String>,
+    summary: Option<String>,
+    description: Option<String>,
+    source: Option<SourceId>,
+    installed: InstalledState,
+    kind: PackageKind,
+    size: Option<u64>,
+    metadata_origin: MetadataOrigin,
+}
+
+struct AppRecord {
+    id: Option<AppId>,
+    name: String,
+    summary: Option<String>,
+    description: Option<String>,
+    icon: Option<TrustedIconRef>,
+    categories: Vec<String>,
+    package_candidates: Vec<PackageId>,
 }
 ```
 
-A provider may be unavailable because its command is missing, its daemon is absent or
-the host is unsupported. Preserve a human-readable reason.
+Unknown values remain `None`/Unknown. Metadata must carry provenance and last-refresh
+information so the UI can indicate stale/incomplete information.
 
-### 3.4 Plans
+### 3.5 Transaction model
 
-A plan is not just the user's selected package list. It must represent what the native
-solver intends to change, including dependencies and removals when available.
+A `ChangeIntent` is what the user asked for. A `BackendPlan` is what a native provider
+resolved. A `BatchPlan` is an ordered group of backend plans. These are different objects.
 
-Each plan step records:
+Each resolved change contains action (install/update/downgrade/remove/reinstall/obsolete),
+exact native package identity, previous/candidate versions where known, download/installed
+size where known, and whether the change is dependency-driven or explicitly selected when
+the backend can tell us.
 
-- backend and action;
-- exact selected target IDs;
-- native-resolved changes where parseable;
-- preview quality: `Native`, `Estimated` or `Unavailable`;
-- warning/notes where the native tool cannot provide a trustworthy preview.
+Each plan has `PreviewQuality::{NativeComplete, NativePartial, Estimated, Unavailable}`.
+Never display an incomplete list as a complete solver preview. If a backend cannot provide
+a safe preview, require an explicit warning and a confirmation policy approved for that
+backend; otherwise keep its mutation capability disabled.
 
-Never claim cross-backend atomicity. Apply backend steps sequentially and report partial
-success/failure accurately.
+A plan is invalidated if provider state changed, repositories were refreshed, or a
+conflicting external package-manager transaction ran after review. Re-plan and ask for
+confirmation again if the transaction result differs materially from the approved plan.
 
-### 3.5 Execution safety
+### 3.6 Security boundary
 
-- Only `exec/runner.rs` may use `std::process::Command` for ordinary application commands.
-- `paket-helper` has its own narrowly-scoped process-spawn code.
-- Always set `LC_ALL=C` for output parsers.
-- Cap captured stdout/stderr to avoid unbounded memory use.
-- Never use `sh -c`, `bash -c`, interpolated shell strings or arbitrary UI-provided argv.
-- Validate native package IDs in the backend and validate again in the privileged helper.
-- Never disable signature verification or auto-import a repository key.
+- Only `runtime/process.rs` spawns normal unprivileged commands.
+- Only `paket-helper` spawns privileged package-manager commands.
+- The helper accepts typed operations, never an executable, arbitrary argv, working
+  directory, environment, or shell string from the GUI.
+- Helper binary must be root-owned, not writable by regular users, installed at a fixed
+  absolute path, and invoked through the system's polkit mechanism.
+- Use native polkit integrations when the backend provides them (DNF5 daemon, Flatpak
+  system helper, snapd); do not wrap those operations in a second authentication layer.
+- Do not set permissive polkit rules or retain passwordless authorization by default.
+- Do not log secrets, credential-bearing URLs, repository auth config, or full environment.
+- Do not disable GPG/signature checks or auto-import keys.
 
 ---
 
-# 4. Implementation tasks
+## 4. Backend behavior contracts
 
-## Stage A — Project foundation
+### 4.1 DNF5 and DNF4 are different providers
 
-**Gate G0.** Complete S01–S06. The project builds and has the smallest useful
-domain model. No package-manager commands yet.
+DNF5 has JSON output for supported commands and a documented D-Bus daemon API. The DNF5
+`repoquery` command uses a query-format interface; do not assume every command supports JSON.
+The `dnf5daemon-server` service exposes session, goal resolution, transaction methods,
+polkit authorization, and transaction progress signals. Use its documented API for DNF5
+system mutations when available and qualify the exact server/API version in the support
+matrix. The service is a separate package on Fedora; detect it and report the missing
+capability clearly. If implementing a CLI fallback, keep it a separate tested transport.
 
-### S01 — Inspect repository and record baseline
+DNF4 is a separate future adapter and is not part of the first production support matrix.
+If added later, command syntax, output, machine-readable support, and helper behavior must
+be researched and fixture-tested independently. Do not run DNF4 through DNF5 parsers.
 
-**Goal:** establish the actual starting state without changing implementation code.
+### 4.2 APT / dpkg
 
-**Allowed changes:** `docs/baseline.md` only.
+Use `dpkg-query` for installed package inventory and APT for repository search, dependency
+resolution, simulations, updates, and installs/removals. APT exposes machine-readable
+progress through `APT::Status-Fd`; use it rather than parsing a localized progress bar.
+Treat dpkg lock contention as a normal Busy/Waiting state. Preserve local conffiles by a
+reviewed policy; never silently force overwrite or discard local configuration.
 
-**Implementation:**
+Do not use raw `dpkg -i` as the ordinary installation path. Local `.deb` installs, if later
+supported, go through APT with file validation and a typed helper flow.
 
-1. Inspect the repository tree, Cargo manifest, Rust toolchain, existing tests and CI.
-2. Identify whether the repository already contains code that overlaps this plan.
-3. Record current `cargo test`, `cargo check` and `cargo fmt --check` results where
-   applicable. Do not “fix everything” during reconnaissance.
-4. Record OS/distribution details from `/etc/os-release` and whether `dnf5`, `flatpak`
-   and `pkexec` are present. Do not perform package operations.
+### 4.3 Pacman and AUR
 
-**Validation:** run baseline commands without modifying source.
+Arch does not support partial upgrades. Never implement `pacman -Sy package` or refresh
+sync databases without completing the corresponding full upgrade. A normal repository
+install/update plan must incorporate `pacman -Syu` semantics and include any full-system
+upgrade effects in the review. If the provider cannot present a sufficiently honest plan,
+mark its preview quality accordingly or disable that operation until a reliable resolver
+path is implemented.
 
-**DoD:** baseline file contains repository layout, toolchain version, host distro, current
-build/test status and blockers. No production files changed.
+AUR is not a trusted binary repository. PKGBUILDs are user-produced scripts. Show the
+PKGBUILD and changes since the previous version, require explicit user review, build as the
+logged-in user (never root), preserve build logs, and install the resulting package through
+Pacman. Never assume an AUR signature makes its build script safe.
 
-**Do not:** scaffold a new project if the repository already has one; change dependencies;
-start S02 in the same run.
+### 4.4 Zypper and rpm-ostree
 
-### S02 — Create the minimal Cargo package
+Zypper is its own RPM ecosystem adapter, not an alias for DNF. It has dry-run support,
+non-interactive options, vendor/repository rules, patches, and orphaned-package semantics.
+Do not auto-accept licenses or vendor switches. Record the exact policy shown to the user.
 
-**Prerequisite:** S01.
+rpm-ostree is a separate deployment/layering provider. Its package changes often stage a
+new deployment that becomes active after reboot. The UI must show pending deployment and
+reboot-required states; it must not pretend that layering behaves like a live DNF install.
 
-**Goal:** create a compiling Rust library package and helper binary target.
+### 4.5 Flatpak
 
-**Allowed files:** `Cargo.toml`, `src/lib.rs`, `src/bin/helper.rs` and `.gitignore` if needed.
+A Flatpak identity includes installation scope and full ref details. Distinguish app from
+runtime, remote, architecture, branch, and system/user/other named installations. Do not
+silently choose between same-ID refs from multiple remotes or installations. Deleting app
+data is a separate destructive choice and is off by default. Prefer the supported Flatpak
+CLI, which uses Flatpak's own system helper/polkit path; do not call the privileged
+`org.freedesktop.Flatpak.SystemHelper` interface directly as a third-party client.
 
-**Implementation:**
+### 4.6 Snap
 
-1. Use one Cargo package named `paket`, Rust edition 2024 and the declared minimum
-   Rust version from the current toolchain decision.
-2. Add a library target at `src/lib.rs`.
-3. Add a `paket-helper` binary target with a placeholder `main` that exits successfully.
-4. Do not add Slint dependencies yet.
-5. Add only dependencies required by the next foundational tasks: `serde` with derive,
-   `serde_json` and `thiserror`. If the repository already has valid equivalents, reuse them.
+Snap availability depends on snapd. Snap auto-refresh is controlled by snapd and can happen
+outside Paket. Represent snapd changes/tasks distinctly from Paket's own local queue. Never
+claim Paket owns or prevents auto-refresh behavior. Use supported CLI or documented snapd
+interfaces and reconcile the actual snapd change state after any interruption.
 
-**Validation:** `cargo check --all-targets`; `cargo test`.
+### 4.7 AppImage
 
-**DoD:** both targets compile; no UI dependency is pulled in; clean diff limited to the
-allowed files.
-
-**Do not:** create all planned module directories or add unused dependencies.
-
-### S03 — Add backend and package identifiers
-
-**Prerequisite:** S02.
-
-**Goal:** define stable identities without implementing package behavior.
-
-**Allowed files:** `src/core/mod.rs`, `src/core/model.rs`, `src/lib.rs`, matching unit tests.
-
-**Implementation:**
-
-1. Add `BackendId` variants for `Dnf5`, `Flatpak`, `Apt`, `Pacman`, `Aur`, `Snap` and
-   `AppImage`.
-2. Add `PkgId { backend: BackendId, native: String }`.
-3. Implement `BackendId::as_str()` and `PkgId::key()` for display/list-model keys only.
-4. Derive the traits needed for equality, hashing, cloning and serialization.
-5. Do not parse or normalize `native` in core.
-
-**Validation:** unit tests for stable string forms, equality and distinct IDs with the
-same display name but different backend/native values.
-
-**DoD:** identifiers compile and tests prove that `dnf5:foo` and `flatpak:foo` remain
-separate identities.
-
-**Do not:** add package fields, provider traits, registry or native command logic.
-
-### S04 — Add the minimal package model
-
-**Prerequisite:** S03.
-
-**Goal:** represent a package row returned by a catalog provider.
-
-**Allowed files:** `src/core/model.rs`, model unit tests.
-
-**Implementation:**
-
-1. Add the minimum `Pkg` fields listed in §3.2.
-2. Use `Option` for metadata that may be missing.
-3. Do not add cross-backend version comparison or sorting logic.
-4. Ensure a `Pkg` contains a `PkgId`; do not use package name as identity.
-
-**Validation:** tests for serialization/deserialization and a package with missing optional
-metadata.
-
-**DoD:** package model compiles and round-trips through JSON without losing its ID or
-optional fields.
-
-**Do not:** add `PkgDetail`, `Update`, icons, categories or AppStream enrichment yet.
-
-### S05 — Add backend availability and capability types
-
-**Prerequisite:** S03.
-
-**Goal:** make “backend unavailable” and “operation unsupported” explicit.
-
-**Allowed files:** `src/core/model.rs`, model unit tests.
-
-**Implementation:**
-
-1. Add a minimal `Capability` enum for `Search`, `Installed`, `Details`, `Updates`,
-   `Install` and `Remove`.
-2. Add `BackendInfo` with ID, label, availability, optional version, optional unavailable
-   reason and capabilities.
-3. Do not make assumptions that every backend implements every capability.
-4. Avoid boolean flags for every possible future feature; add capabilities only as needed.
-
-**Validation:** tests for available and unavailable descriptors.
-
-**DoD:** a missing CLI can be represented as an unavailable backend with a reason and an
-empty/limited capability list.
-
-**Do not:** implement probing or registry discovery yet.
-
-### S06 — Add a small typed error model
-
-**Prerequisite:** S02.
-
-**Goal:** distinguish expected failures without leaking raw process errors everywhere.
-
-**Allowed files:** `src/core/error.rs`, `src/core/mod.rs`, matching tests.
-
-**Implementation:**
-
-1. Add `CatalogError` variants for `Unavailable`, `Command`, `Parse` and `NotFound`.
-2. Add `OperationError` variants for `Unsupported`, `Busy`, `AuthDenied`, `Network`,
-   `Dependency`, `Signature`, `NoSpace`, `Cancelled` and a generic native failure.
-3. Keep raw stderr as diagnostic context, not as the enum's only meaning.
-4. Implement user-readable `Display` text with `thiserror`.
-
-**Validation:** unit tests for representative messages and variant matching.
-
-**DoD:** core modules can return typed errors; no `anyhow` dependency is introduced.
-
-**Do not:** implement backend-specific string classification in this step.
+An AppImage is a local executable file. Import must not execute it. Do not assume every
+AppImage has update information; the update endpoint is embedded by the application author
+and may be absent or use a tool-specific mechanism. Store managed files under the Paket
+user data directory, avoid overwriting unrelated files, preserve checksums, and ask before
+replacing/deleting. Launch only after explicit user action and use the normal desktop user,
+never root.
 
 ---
 
-## Stage B — Safe command execution and host detection
+# 5. Incremental implementation tasks
 
-**Gate G1.** Complete S07–S12. The app can run commands safely and test them
-without invoking real package managers.
+Every task below is intentionally narrow. Its “Allowed files” list is a scope boundary,
+not an invitation to create the entire planned tree early.
 
-### S07 — Define command input/output types
+## Stage A — Product and domain foundation
 
-**Prerequisite:** S02, S06.
+**Gate G0.** The codebase has locked decisions, a reproducible toolchain, and tested core
+models. No package-manager operation is executed.
 
-**Goal:** describe a process invocation as structured data.
+### S001 — Inspect the actual repository
 
-**Allowed files:** `src/exec/mod.rs`, `src/exec/runner.rs`.
+**Goal:** record baseline without changing implementation code.
 
-**Implementation:**
+**Allowed files:** `docs/baseline.md` only.
 
-1. Add `RunSpec` with executable, argv, environment overrides, optional working directory,
-   timeout and output-capture mode.
-2. Keep executable separate from arguments; do not accept a shell command string.
-3. Add `RunOutput` with exit code, stdout, bounded stderr tail and duration.
-4. Add `RunError` for spawn failure, timeout, cancellation and output-limit failure.
-5. Do not implement process spawning yet.
+**Implement:** inspect repository tree, Cargo files, toolchain, tests, CI, current host
+`/etc/os-release`, installed package tools, and existing app code. Record baseline `cargo
+check`, `cargo test`, and `cargo fmt --check` where applicable.
 
-**Validation:** unit tests for construction defaults and output-limit behavior where
-possible.
+**Validate:** run baseline commands only.
 
-**DoD:** types compile and no field represents arbitrary shell text.
+**DoD:** baseline file records current state and blockers; no source files changed.
 
-**Do not:** add `tokio`, `async` methods or event-bus abstractions.
+**Do not:** scaffold or rename files in this task.
 
-### S08 — Define the testable runner port
+### S002 — Lock project naming and licensing decision
 
-**Prerequisite:** S07.
+**Prerequisite:** S001.
 
-**Goal:** let backends run commands without depending on `std::process` directly.
+**Allowed files:** `docs/decisions.md`.
 
-**Allowed files:** `src/exec/runner.rs` and `src/exec/mod.rs`.
+**Implement:** record Paket naming, expected distribution model, intended project license,
+third-party license policy, and the Slint Kit GPL-3.0-or-later compatibility gate. If the
+project license is undecided, mark Slint Kit adoption blocked rather than assuming a license.
 
-**Implementation:**
+**Validate:** manually review the decision record.
 
-1. Define a small blocking `Runner` trait with one method that accepts `RunSpec` and
-   returns `RunOutput`/`RunError`.
-2. Keep the method synchronous.
-3. Do not expose `std::process::Child` to backend modules.
-4. Document that only the production runner is allowed to spawn a process.
+**DoD:** license compatibility is an explicit yes/no decision with evidence.
 
-**Validation:** a tiny compile-time test or test stub implementing `Runner`.
+**Do not:** change source license headers or add UI dependencies.
 
-**DoD:** backend code can depend on `dyn Runner` without knowing how processes are run.
+### S003 — Pin Rust toolchain and edition
 
-**Do not:** add streaming progress callbacks yet; that is a later task.
+**Prerequisite:** S002.
 
-### S09 — Implement the real process runner
+**Allowed files:** `rust-toolchain.toml`, `Cargo.toml`.
 
-**Prerequisite:** S08.
+**Implement:** use edition 2024 and set `rust-version = "1.95"` while Slint Kit 0.9.0 is
+selected. Pin the toolchain channel used in CI. Document that any later MSRV reduction
+requires proving compatibility with the selected Slint/Kit versions.
 
-**Goal:** execute one process safely and capture bounded output.
+**Validate:** `rustc --version`, `cargo check`.
 
-**Allowed files:** `src/exec/runner.rs`, runner unit tests.
+**DoD:** local and CI toolchain requirements are explicit and reproducible.
 
-**Implementation:**
+**Do not:** add Tokio/Slint or backend dependencies yet.
 
-1. Use `Command::new(executable).args(argv)`; never invoke a shell.
-2. Add the requested environment overrides and always set `LC_ALL=C` unless a task
-   explicitly documents why a backend needs a different locale.
-3. Drain stdout and stderr concurrently so neither pipe can block the child.
-4. Bound captured stdout (for example, 32 MiB) and retain only a bounded stderr tail
-   (for example, the last 200 lines); if a configured hard output limit is exceeded, stop
-   the child and return `OutputLimit`.
-5. Convert output with `String::from_utf8_lossy`.
-6. Return non-zero exit codes as output, not as a spawn error; callers classify them.
-7. Implement timeout with a bounded terminate/kill sequence. Do not fake successful
-   cancellation if the child could not be stopped.
+### S004 — Create the minimal Cargo package
 
-**Validation:** tests using a known harmless executable (`printf`/`echo` where available)
-plus a test for non-zero exit status and timeout.
+**Prerequisite:** S003.
 
-**DoD:** runner returns correct stdout, stderr, exit code and duration; output remains
-bounded; static scan confirms no shell invocation.
+**Allowed files:** `Cargo.toml`, `src/lib.rs`, `src/main.rs`, `src/bin/helper.rs`.
 
-**Do not:** run real package-manager operations.
+**Implement:** create one Cargo package named `paket`, one library, GUI binary placeholder,
+and `paket-helper` placeholder. Keep targets compiling. Add only serde, serde_json and
+thiserror if the project lacks equivalents.
 
-### S10 — Add a fake runner for backend tests
+**Validate:** `cargo check --all-targets`; `cargo test`.
 
-**Prerequisite:** S08.
+**DoD:** all targets build; no unused backend/UI dependency set.
 
-**Goal:** test backend command construction and parsing without touching the host.
+**Do not:** create all subdirectories or implement command execution.
 
-**Allowed files:** `src/exec/fake.rs` or `tests/support/fake_runner.rs`, test support only.
+### S005 — Establish formatting and lint policy
 
-**Implementation:**
+**Prerequisite:** S004.
 
-1. Fake runner stores expected executable/argv patterns and queued outputs.
-2. A mismatch should fail loudly with a useful assertion message.
-3. Allow tests to assert the order and number of invocations.
-4. Keep the fake out of production builds unless it is harmless and feature-gated.
+**Allowed files:** `rustfmt.toml`, `clippy.toml` only if required, `Cargo.toml`.
 
-**Validation:** a test proves the fake returns a queued output and detects an unexpected
-command.
+**Implement:** adopt standard rustfmt; configure no broad allowlist. Document the required
+CI commands: fmt, test, clippy with warnings denied.
 
-**DoD:** a backend unit test can run with no DNF/Flatpak installed and no root privileges.
+**Validate:** `cargo fmt --check`; `cargo clippy --all-targets -- -D warnings`.
 
-**Do not:** create a generic mocking framework.
+**DoD:** project has a repeatable local lint baseline.
 
-### S11 — Parse `/etc/os-release`
+**Do not:** add unrelated lint suppression attributes.
 
-**Prerequisite:** S02.
+### S006 — Add typed core errors
 
-**Goal:** detect the host distribution using a simple, testable parser.
+**Prerequisite:** S004.
 
-**Allowed files:** `src/platform/mod.rs`, `src/platform/os_release.rs`, fixtures/tests.
+**Allowed files:** `src/core/mod.rs`, `src/core/error.rs`.
 
-**Implementation:**
+**Implement:** add distinct `CatalogError`, `PlanError`, and `OperationError` families for
+unsupported capability, unavailable backend, not-found, invalid identity, busy/locked,
+authorization denied, network, dependency, signature/trust, no space, timeout, cancellation,
+parse failure, stale plan, and native command failure. Keep native stderr/diagnostic detail
+separate from user-facing message.
 
-1. Parse key/value lines; ignore comments and blank lines.
-2. Support quoted and unquoted values according to common os-release syntax; do not use
-   shell `source` or execute the file.
-3. Extract `ID`, `ID_LIKE`, `VERSION_ID` and `PRETTY_NAME`.
-4. Unknown or missing values remain optional.
-5. Add fixtures for Fedora, Ubuntu/Debian, Arch and an unknown distribution.
+**Validate:** unit tests for matching variants and safe user messages.
 
-**Validation:** parser unit tests for all fixtures and malformed lines.
+**DoD:** callers can branch on error kinds without parsing arbitrary stderr.
 
-**DoD:** parser never panics on malformed input and never executes `/etc/os-release`.
+**Do not:** implement distro-specific text parsing here.
 
-**Do not:** decide backend availability in this task.
+### S007 — Add backend and package identity types
 
-### S12 — Add backend registry skeleton
+**Prerequisite:** S004.
 
-**Prerequisite:** S05, S10, S11.
+**Allowed files:** `src/core/ids.rs`, `src/core/mod.rs`.
 
-**Goal:** hold backend descriptors and expose a stable list to the rest of the app.
+**Implement:** add `BackendId`, `PackageId { backend, scope, native }`, `SourceId`, and
+stable display/key helpers. Include all planned providers but keep native IDs opaque.
 
-**Allowed files:** `src/core/registry.rs`, `src/core/mod.rs`, tests.
+**Validate:** equality/hash/serialization tests; same name from DNF and Flatpak must not
+compare equal.
 
-**Implementation:**
+**DoD:** package identity includes backend and scope and is stable as a UI list key.
 
-1. Add a registry that stores backend descriptors in a deterministic order.
-2. Provide lookup by `BackendId` and iteration over descriptors.
-3. Allow unavailable descriptors to remain in the registry with a reason.
-4. Do not create a dynamic plugin loader.
-5. Do not instantiate DNF/Flatpak providers until their specific tasks.
+**Do not:** parse a native package identifier in core.
 
-**Validation:** tests for deterministic ordering, lookup and unavailable entries.
+### S008 — Add installation scopes
 
-**DoD:** registry behavior is independent of any installed package manager.
+**Prerequisite:** S007.
 
-**Do not:** add all backend modules or feature flags now.
+**Allowed files:** `src/core/ids.rs`, matching tests.
+
+**Implement:** model System, User, named Flatpak installation, and Paket-managed local
+store scopes. Use a typed enum, not free-form labels for mutation operations.
+
+**Validate:** serde round-trip and distinct system/user identity tests.
+
+**DoD:** the same Flatpak ref in user and system installations remains distinct.
+
+**Do not:** probe the host yet.
+
+### S009 — Add package record model
+
+**Prerequisite:** S007–S008.
+
+**Allowed files:** `src/core/package.rs`, tests.
+
+**Implement:** add `PackageRecord` with ID, name, optional version/architecture/summary/
+description/source/size, installed state, package kind, and metadata origin. Add
+`UpdateRecord` (package ID, current version, candidate version, and optional update metadata)
+and `SearchScope` (optional backend, installation scope, and source filters). All uncertain
+metadata is optional or explicitly Unknown.
+
+**Validate:** serialization tests including missing fields and distinct same-name records.
+
+**DoD:** no package is identified by its display name.
+
+**Do not:** add global version comparison or AppStream grouping.
+
+### S010 — Add application grouping model
+
+**Prerequisite:** S009.
+
+**Allowed files:** `src/core/package.rs`, tests.
+
+**Implement:** add `AppRecord` and optional `AppId` independent of `PackageId`. One app may
+reference several candidates; package candidates remain individually addressable.
+
+**Validate:** test one app mapping to RPM and Flatpak candidates without collapsing them.
+
+**DoD:** application grouping is many-to-many and never changes install identity.
+
+**Do not:** build search ranking.
+
+### S011 — Add backend capability model
+
+**Prerequisite:** S007.
+
+**Allowed files:** `src/core/capability.rs`, tests.
+
+**Implement:** capabilities for installed list, search, details, updates, plan, install,
+remove, sources, local import, launch, and history. Add BackendInfo with availability,
+version, unsupported reason, and capability set.
+
+**Validate:** descriptors for absent, read-only, and fully available providers.
+
+**DoD:** UI can distinguish unavailable, unsupported, and empty results.
+
+**Do not:** infer capability from distro ID alone.
+
+### S012 — Add transaction domain models
+
+**Prerequisite:** S006–S011.
+
+**Allowed files:** `src/core/transaction.rs`, tests.
+
+**Implement:** `ChangeIntent`, `ResolvedChange`, `BackendPlan`, `BatchPlan`, `BackendOutcome`,
+preview quality, job/transaction statuses, per-step outcomes, and partial-success summary.
+Keep selected intent separate from solver-resolved dependency effects.
+
+**Validate:** tests for complete preview, partial preview, unavailable preview, and
+multi-backend partial failure.
+
+**DoD:** domain model can describe dependency installs/removals and non-atomic batches.
+
+**Do not:** implement planner/executor logic.
 
 ---
 
-## Stage C — DNF5 read-only catalog
+## Stage B — Tokio runtime and process execution
 
-**Gate G2.** Complete S13–S21. On a Fedora Workstation host, installed
-packages, search results and updates are available through typed Rust models. No writes.
+**Gate G1.** Paket can execute bounded asynchronous commands, stream output, cancel
+explicitly, and keep Slint-independent runtime ownership.
 
-### S13 — Probe DNF5 availability
+### S013 — Add Tokio with minimal features
 
-**Prerequisite:** S09, S11, S12.
+**Prerequisite:** S004.
 
-**Goal:** determine whether the current host can use the DNF5 provider.
+**Allowed files:** `Cargo.toml`, `Cargo.lock`.
 
-**Allowed files:** `src/backends/mod.rs`, `src/backends/dnf/mod.rs`,
-`src/backends/dnf/probe.rs`, tests.
+**Implement:** add Tokio 1.54.1 with only needed features (`rt-multi-thread`, `macros`,
+`process`, `time`, `sync`, `io-util`, `fs`, and `signal` where supported). Add tokio-util
+only when the cancellation task needs `CancellationToken`.
 
-**Implementation:**
+**Validate:** `cargo tree -e features`; `cargo check --all-targets`.
 
-1. Confirm the host is a supported traditional Fedora/RHEL-family system using parsed
-   `os-release` data. Do not enable DNF5 on Fedora Atomic desktops.
-2. Probe the `dnf5` executable with a bounded version command.
-3. Return `BackendInfo` whether available or unavailable.
-4. Include a clear reason for unsupported distro, missing executable or failed probe.
-5. Do not infer support solely from the existence of `rpm`.
+**DoD:** Tokio compiles and enabled features are documented.
 
-**Validation:** fake-runner tests for supported Fedora, unsupported distro, missing DNF5
-and failed version command. Run a read-only probe on a Fedora host if available.
+**Do not:** use `full` by default or integrate Slint in this task.
 
-**DoD:** probing never panics and does not run a package transaction.
+### S014 — Construct a dedicated Tokio runtime
 
-**Do not:** implement catalog commands yet.
+**Prerequisite:** S013.
 
-### S14 — Parse DNF5 installed-package JSON
+**Allowed files:** `src/runtime/mod.rs`, `src/runtime/runtime.rs`.
 
-**Prerequisite:** S04, S13.
+**Implement:** create a runtime builder function returning a multi-thread runtime/handle.
+The final startup shape is: the main OS thread constructs the Slint component and starts
+the Slint event loop; a dedicated named `std::thread` owns the Tokio runtime and runs the
+application coordinator with `Runtime::block_on`. UI callbacks submit commands through a
+bounded Tokio `mpsc::Sender` using non-blocking `try_send`; the coordinator sends results
+back through bounded events, and the UI uses `slint::invoke_from_event_loop` to update
+models. Do not use `#[tokio::main]` around the Slint event loop. Add explicit startup,
+shutdown, and runtime-thread join ownership.
 
-**Goal:** convert one captured installed-package JSON response into `Vec<Pkg>`.
+**Validate:** a test starts the runtime owner, sends one command through the channel,
+observes its result, requests shutdown, and confirms the owner thread joins.
 
-**Allowed files:** `src/backends/dnf/parse.rs`, `tests/fixtures/dnf/installed.json`, tests.
+**DoD:** the runtime lifecycle has one owner, Slint stays on the main thread, and UI callbacks
+never block waiting for Tokio work.
 
-**Implementation:**
+**Do not:** start package-manager processes.
 
-1. Use a real sample captured from the supported DNF5 version as the fixture.
-2. Map only fields needed by the current `Pkg` model.
-3. Construct backend-owned `PkgId` values that distinguish package architecture/version
-   where required for safe targeting.
-4. Treat absent or unknown fields as `None`.
-5. Return `CatalogError::Parse` with useful context for invalid JSON or missing required
-   identity fields.
+### S015 — Define structured command specifications
 
-**Validation:** fixture test, malformed JSON test and missing-optional-field test.
+**Prerequisite:** S013.
 
-**DoD:** parser is a pure function with no process execution and no filesystem access.
+**Allowed files:** `src/runtime/command.rs`.
 
-**Do not:** invent a JSON schema from memory; capture actual output first.
+**Implement:** `CommandSpec` with fixed executable path/name, `Vec<OsString>` argv, explicit
+environment overrides, timeout, output limits, and capture mode. Never accept a shell
+string or arbitrary working directory from UI input.
 
-### S15 — Implement DNF installed-package listing
+**Validate:** construction tests and a test proving one query containing spaces stays one
+argument.
 
-**Prerequisite:** S14.
+**DoD:** all invocation data is structured and typed.
 
-**Goal:** list installed RPM packages using DNF5's machine-readable output.
+**Do not:** spawn a process.
 
-**Allowed files:** `src/backends/dnf/catalog.rs`, `src/backends/dnf/mod.rs`, tests.
+### S016 — Define async process runner port
 
-**Implementation:**
+**Prerequisite:** S015.
 
-1. Build the exact installed-list argv using DNF5's JSON mode supported by the researched
-   DNF version (`dnf5 list --installed --json`).
-2. Execute through `Runner` with `LC_ALL=C` and a bounded timeout/output cap.
-3. Reject non-zero command exit as a catalog command error.
-4. Pass stdout to the pure parser from S14.
-5. Do not run as root for read-only listing.
+**Allowed files:** `src/runtime/process.rs`.
 
-**Validation:** fake-runner test asserts exact argv and parsed result. Manual Fedora check
-compares a sample of results with `rpm -qa`.
+**Implement:** define one small async `ProcessRunner` interface returning a process handle
+or structured completion/events. Keep backend-facing API independent of Tokio concrete
+child types.
 
-**DoD:** installed package list returns typed `Pkg` values and does not require privilege.
+**Validate:** compile-time fake implementation.
 
-**Do not:** add search/details/updates in this task.
+**DoD:** providers can depend on a runner port and tests can substitute a fake.
 
-### S16 — Parse DNF5 repoquery output
+**Do not:** add a general process framework.
 
-**Prerequisite:** S14.
+### S017 — Spawn one process safely
 
-**Goal:** parse DNF search results from the DNF5 `repoquery --queryformat` output into the same `Pkg` model.
+**Prerequisite:** S016.
 
-**Allowed files:** `src/backends/dnf/parse.rs`, search fixtures and tests.
+**Allowed files:** `src/runtime/process.rs`.
 
-**Implementation:**
+**Implement:** use `tokio::process::Command` with fixed executable and argv. Clear/sanitize
+environment according to the spec, force `LC_ALL=C` for parsers that need stable English,
+set stdin/stdout/stderr explicitly, and never invoke a shell.
 
-1. Do not assume `repoquery` supports `--json`; the researched interface exposes `--queryformat`.
-2. Verify the exact DNF5 `repoquery` queryformat syntax against the installed DNF5 help/man page and a real command before capturing the fixture.
-3. Start with the smallest stable field set: name, EVR/version, architecture and repository ID. Add summary only if the chosen output format can delimit it safely.
-4. Parse the chosen delimiter format with strict field-count validation.
-5. Mark results as not installed unless the source explicitly says otherwise.
-6. Preserve multiple package candidates when their native IDs differ.
-7. Add empty-result and malformed-record fixtures.
+**Validate:** harmless executable tests for success, non-zero exit, missing executable.
 
-**Validation:** parser-only fixture tests.
+**DoD:** process output and exit status are returned without blocking the Slint thread.
 
-**DoD:** search parser is deterministic and does not deduplicate by display name.
+**Do not:** implement provider-specific command builders.
 
-**Do not:** run the DNF search command in this step.
+### S018 — Stream stdout and stderr concurrently
 
-### S17 — Implement DNF search
+**Prerequisite:** S017.
 
-**Prerequisite:** S16.
+**Allowed files:** `src/runtime/process.rs`, tests.
 
-**Goal:** run DNF search from a user query and parse its results.
+**Implement:** drain both pipes concurrently to prevent deadlock. Emit typed line/chunk
+events with source stream; preserve final partial line. Do not assume all output is UTF-8.
 
-**Allowed files:** `src/backends/dnf/catalog.rs`, tests.
+**Validate:** test a child that writes heavily to both streams.
 
-**Implementation:**
+**DoD:** large stdout+stderr cannot block one another.
 
-1. Construct argv as separate arguments; pass the query as one argument.
-2. Use the `dnf5 repoquery` command and queryformat verified in S16; do not append unverified flags.
-3. Execute without root, with timeout and output bounds.
-4. Return an empty vector for a valid no-result response.
-5. Return a typed error for command failure or malformed output.
+**Do not:** parse package-manager progress here.
 
-**Validation:** fake-runner checks executable/argv and no-result behavior. Manual query on
-Fedora for a common package such as `htop`.
+### S019 — Enforce output and memory bounds
 
-**DoD:** query text never becomes shell syntax and results preserve DNF native identity.
+**Prerequisite:** S018.
 
-**Do not:** add network catalogue indexing or global cross-backend deduplication.
+**Allowed files:** `src/runtime/process.rs`, tests.
 
-### S18 — Add DNF package details
+**Implement:** define per-command stdout/stderr limits, bounded diagnostic tail, and a
+streaming mode for long transactions. On hard limit, report a typed output-limit error and
+terminate according to the cancellation policy.
 
-**Prerequisite:** S15, S17.
+**Validate:** test output just below and above the configured limit.
 
-**Goal:** retrieve basic details for one selected DNF package.
+**DoD:** a noisy command cannot allocate unbounded memory.
 
-**Allowed files:** `src/core/model.rs`, `src/backends/dnf/catalog.rs`, DNF parser/tests.
+**Do not:** truncate transaction output silently and report success.
 
-**Implementation:**
+### S020 — Add command timeouts
 
-1. Add `PkgDetail` with only fields actually returned by the chosen DNF5 info/repoquery
-   command: package row, description and optional homepage/license/size if present.
-2. Validate `PkgId.backend == BackendId::Dnf5` before decoding its native ID.
-3. Build the native query from validated decoded fields, not from the display name.
-4. Return `NotFound` for a package that no longer exists.
+**Prerequisite:** S017.
 
-**Validation:** fake-runner test for valid ID, wrong backend ID and not-found output.
+**Allowed files:** `src/runtime/process.rs`, tests.
 
-**DoD:** details cannot accidentally query a Flatpak ID or interpolate arbitrary UI text.
+**Implement:** separate short read-command defaults from long-running transaction policy.
+A timed-out read command can be terminated; a transaction timeout must request graceful
+cancellation and reconcile before reporting its final state.
 
-**Do not:** fetch screenshots, ratings, user reviews or AppStream data.
+**Validate:** timeout tests using a sleeping child process.
 
-### S19 — Parse DNF5 update JSON
+**DoD:** timeout has an explicit result state and does not masquerade as success.
 
-**Prerequisite:** S04.
+**Do not:** apply a 30-second timeout to package installations.
 
-**Goal:** parse the native update list into a small `Update` model.
+### S021 — Add explicit cancellation tokens
 
-**Allowed files:** `src/core/model.rs`, `src/backends/dnf/parse.rs`, update fixture/tests.
+**Prerequisite:** S020.
 
-**Implementation:**
+**Allowed files:** `src/runtime/process.rs`, `Cargo.toml` if tokio-util is required.
 
-1. Add the minimal `Update` model: package ID, name, current version and candidate version.
-2. Capture real `dnf5 list --upgrades --json` output from the supported version.
-3. Map missing version/source fields to `None`.
-4. Do not compare DNF versions with other ecosystems.
+**Implement:** allow a caller to request cancellation while retaining child ownership.
+Queued work is cancellable without spawn; running work enters `CancelRequested` until the
+child exits and is reaped.
 
-**Validation:** parser tests for normal, empty and malformed responses.
+**Validate:** tests for cancellation before spawn and while running.
 
-**DoD:** updates are parsed without invoking a command and preserve package identity.
+**DoD:** dropping a Rust future is not treated as proof that a process stopped.
 
-**Do not:** calculate security update status unless the source explicitly supplies it.
+**Do not:** instantly SIGKILL a package manager.
 
-### S20 — Implement DNF update listing
+### S022 — Add Unix process-group cancellation
 
-**Prerequisite:** S19.
+**Prerequisite:** S021.
 
-**Goal:** expose available DNF upgrades through the backend catalog.
+**Allowed files:** `src/runtime/process.rs`, platform-specific helper module, tests.
 
-**Allowed files:** `src/backends/dnf/catalog.rs`, tests.
+**Implement:** when a provider may spawn descendants, start a dedicated Unix process group
+and define staged termination (graceful interrupt, bounded wait, then provider-approved
+termination). Keep `Child` alive and await/reap it. Document any backend that must not be
+force-killed mid-transaction.
 
-**Implementation:**
+**Validate:** test parent+child termination in a disposable helper process.
 
-1. Run DNF5's JSON upgrade-list command unprivileged.
-2. Use a bounded timeout and output cap.
-3. Parse with the function from S19.
-4. Treat unavailable metadata as empty/unknown, not as “up to date” unless the command
-   successfully reports an empty result.
+**DoD:** cancellation policy covers descendants and zombie/reaping behavior.
 
-**Validation:** fake-runner tests for command failure, empty output and one update.
+**Do not:** claim all native package managers are safely cancellable at every moment.
 
-**DoD:** provider can distinguish successful zero updates from a failed update query.
+### S023 — Add deterministic fake process runner
 
-**Do not:** install updates yet.
+**Prerequisite:** S016.
 
-### S21 — Add DNF read-contract tests
+**Allowed files:** `tests/support/fake_runner.rs`, `tests/support/mod.rs`.
 
-**Prerequisite:** S15, S17, S18, S20.
+**Implement:** queue predetermined results/events, assert exact executable/argv/env, and
+fail tests on unexpected commands. Keep fake support out of normal production behavior.
 
-**Goal:** verify the read-only contract without requiring Fedora or root.
+**Validate:** fake-runner self-test for matching and mismatch.
 
-**Allowed files:** `tests/dnf_catalog.rs`, test fixtures and support only.
+**DoD:** provider tests can run without installed package tools or root privileges.
 
-**Implementation:**
+**Do not:** create a general mocking library.
 
-1. Test installed, search, details and updates through the public DNF adapter API.
-2. Use fake runner responses; do not mock the parser directly in every test.
-3. Assert every command is non-privileged and has `LC_ALL=C`.
-4. Assert a backend command/parse failure does not terminate the test process.
+### S024 — Add bounded runtime event channels
 
-**Validation:** `cargo test dnf_catalog` on a machine without DNF installed.
+**Prerequisite:** S018.
 
-**DoD:** DNF read operations have an end-to-end fake-runner test suite.
+**Allowed files:** `src/runtime/events.rs`.
 
-**Do not:** start DNF mutations until G2 passes.
+**Implement:** define typed `BackendEvent`/progress events and
+`type EventSink = tokio::sync::mpsc::Sender<BackendEvent>`. Use bounded `mpsc` for commands
+and terminal events; use a latest-value `watch` or coalescing mechanism for progress.
+Never let a fast child process flood an unbounded UI queue. Terminal results must have a
+reliable delivery path even when progress is coalesced.
+
+**Validate:** tests for queue capacity and progress coalescing.
+
+**DoD:** event delivery is bounded and terminal events cannot be silently lost.
+
+**Do not:** add a broadcast event bus.
+
+### S025 — Add structured logging
+
+**Prerequisite:** S014.
+
+**Allowed files:** `src/runtime/logging.rs`, `src/runtime/mod.rs`, `Cargo.toml`.
+
+**Implement:** add `tracing` and a subscriber with configurable log levels and rotation or
+bounded size. Redact credential-bearing URLs, authorization data, environment variables,
+and sensitive helper payload fields.
+
+**Validate:** tests for redaction and a sample log record.
+
+**DoD:** failures can be diagnosed without recording secrets.
+
+**Do not:** add telemetry or remote reporting.
+
+### S026 — Define application shutdown behavior
+
+**Prerequisite:** S014, S021, S024.
+
+**Allowed files:** `src/app/coordinator.rs`, `src/runtime/runtime.rs`.
+
+**Implement:** stop accepting new work, cancel read-only work, and prevent silent app exit
+while a system transaction is running. Offer minimize/keep-open or wait-for-completion;
+never drop the child handle and assume the package operation ended. Persist enough state
+for next-launch reconciliation.
+
+**Validate:** unit tests for shutdown with idle, queued, and active task states.
+
+**DoD:** shutdown behavior is deterministic and documented.
+
+**Do not:** implement the final UI dialog yet.
 
 ---
 
-## Stage D — DNF planning and privileged mutations
+## Stage C — Batch intents, scheduler, and transaction lifecycle
 
-**Gate G3.** Complete S22–S34. This is the first privileged feature. Do not
-combine it with Flatpak or the GUI.
+**Gate G2.** Multiple clicks create a reviewable batch, and only one mutation batch can run
+at a time. No backend-specific write is enabled before this gate.
 
-### S22 — Add the minimal transaction model
+### S027 — Define job and batch identifiers
 
-**Prerequisite:** G2.
+**Prerequisite:** S012.
 
-**Goal:** represent a selected action separately from the native solver's expected changes.
+**Allowed files:** `src/core/transaction.rs`.
 
-**Allowed files:** `src/core/model.rs`, model tests.
+**Implement:** add stable `JobId`, `BatchId`, `BackendTransactionId`, and creation timestamps.
+Use a small existing dependency only if already present; otherwise use a simple monotonic
+or random ID strategy approved in decisions.
 
-**Implementation:**
+**Validate:** uniqueness and serialization tests.
 
-1. Add `Action` (`Install`, `Remove`, `Upgrade`), `ChangeKind`, `PlanPreview`,
-   `PlannedChange`, `PlanStep` and `Plan`.
-2. A `PlanStep` records backend, action, selected targets, resolved changes, preview quality
-   and user-visible notes.
-3. Keep the model backend-neutral, but do not pretend every backend can provide the same
-   preview completeness.
-4. Use a simple unique plan ID generated by core; do not add a UUID dependency yet.
+**DoD:** every job/step has a stable traceable identity.
 
-**Validation:** serialization and equality tests for a plan with a dependency change and
-one with `PlanPreview::Unavailable`.
+**Do not:** add persistence.
 
-**DoD:** a plan can represent both user-selected targets and additional native-resolved
-changes.
+### S028 — Implement draft intent collection
 
-**Do not:** implement planning or execution logic.
-
-### S23 — Build DNF dry-run commands
-
-**Prerequisite:** S22.
-
-**Goal:** safely construct DNF5 simulation argv for install and remove.
-
-**Allowed files:** `src/backends/dnf/plan.rs`, tests.
-
-**Implementation:**
-
-1. Accept only DNF `PkgId`s; reject IDs from other backends.
-2. Decode and validate each native ID using DNF's identifier rules.
-3. Build a DNF5 dry-run/assume-no command for install or remove using the syntax verified
-   against the supported DNF version.
-4. Do not add `-y` behavior that causes a real transaction; simulation must remain a dry run.
-5. Keep install and remove command construction in separate small functions.
-
-**Validation:** unit tests assert exact argv and reject malformed IDs, empty targets and
-wrong-backend IDs.
-
-**DoD:** the builder cannot turn an arbitrary package display string into command options.
-
-**Do not:** execute the command or parse output yet.
-
-### S24 — Parse DNF dry-run transaction output
-
-**Prerequisite:** S23.
-
-**Goal:** turn the native simulation result into `PlanStep` changes.
-
-**Allowed files:** `src/backends/dnf/plan.rs`, parser fixtures/tests.
-
-**Implementation:**
-
-1. Capture actual dry-run output for install and remove from the supported DNF5 version.
-2. Parse the package changes DNF says it would perform, including dependency installs,
-   upgrades and removals where the output exposes them.
-3. Mark the preview `Native` only when the complete transaction set is parsed.
-4. If the output format cannot be parsed completely, fail planning or mark preview
-   `Unavailable`; never fabricate a partial list as complete.
-5. Include download/install sizes only when native output provides reliable values.
-
-**Validation:** fixtures for install, remove, no-op, dependency changes and malformed
-output.
-
-**DoD:** the parser is pure, fixture-backed and honest about preview completeness.
-
-**Do not:** run the real mutation command.
-
-### S25 — Define the helper request/response protocol
-
-**Prerequisite:** S22.
-
-**Goal:** define the smallest typed protocol for requesting DNF install/remove.
-
-**Allowed files:** `src/helper/mod.rs`, `src/helper/protocol.rs`, tests.
-
-**Implementation:**
-
-1. Define request variants for DNF install and DNF remove only.
-2. Request contains an operation enum and a list of validated package identifiers; it does
-   not contain an executable path, arbitrary argv or environment overrides.
-3. Define JSONL response events for started, output/progress text and completed/failed.
-4. Add a protocol version field so incompatible client/helper binaries fail closed.
-5. Keep the types serde-compatible and small.
-
-**Validation:** JSON round-trip tests and tests that unknown operation/version is rejected.
-
-**DoD:** protocol cannot express arbitrary process execution.
-
-**Do not:** implement helper process spawning or support APT/Pacman yet.
-
-### S26 — Make the helper binary read one request
-
-**Prerequisite:** S02, S25.
-
-**Goal:** read and parse one JSON request from stdin in the helper binary.
-
-**Allowed files:** `src/bin/helper.rs`, helper protocol tests.
-
-**Implementation:**
-
-1. Read one bounded line from stdin.
-2. Deserialize into the typed request.
-3. Reject oversized, malformed or unsupported protocol input with a non-zero exit.
-4. Ensure stdout is reserved for protocol JSONL; diagnostic messages go to stderr.
-5. Do not execute any command in this task.
-
-**Validation:** tests or a small subprocess test for valid JSON, malformed JSON and oversized
-input.
-
-**DoD:** helper accepts exactly one typed request and does nothing beyond validation/parsing.
-
-**Do not:** add `pkexec` invocation or root checks yet.
-
-### S27 — Validate DNF helper requests and construct fixed argv
-
-**Prerequisite:** S26.
-
-**Goal:** ensure helper builds only approved DNF commands.
-
-**Allowed files:** `src/bin/helper.rs` or `src/helper/validate.rs`, tests.
-
-**Implementation:**
-
-1. Check effective UID is root before performing privileged work.
-2. Accept only the DNF install/remove operation variants from S25.
-3. Validate each package identifier against a conservative DNF package-ID grammar.
-4. Reject empty lists, excessive list sizes, leading option-like values and malformed IDs.
-5. Construct the executable and argv from a static match on the operation. Never accept
-   argv from stdin.
-6. Set `LC_ALL=C` and safe stdin behavior.
-
-**Validation:** unit tests for valid IDs, option injection attempts, path-like strings,
-unknown operation and non-root invocation.
-
-**DoD:** helper can produce only the two explicitly supported DNF command forms.
-
-**Do not:** support arbitrary backend commands or repository/key management.
-
-### S28 — Run the DNF child process in the helper
-
-**Prerequisite:** S27.
-
-**Goal:** execute the validated command and return a bounded JSONL result stream.
-
-**Allowed files:** `src/bin/helper.rs` or a small helper execution module; tests.
-
-**Implementation:**
-
-1. Spawn the fixed DNF executable with the argv constructed in S27.
-2. Drain stdout and stderr so the child cannot block on a full pipe.
-3. Emit protocol events only on helper stdout; retain the last bounded stderr lines for
-   diagnostics.
-4. Return the real child exit code in the completion response.
-5. For this first version, it is acceptable to emit only `Started` and final `Completed`/
-   `Failed` events. Do not parse progress text yet. Never output raw unframed logs on stdout.
-
-**Validation:** test with a harmless fake executable if the helper execution is structured
-for injection; otherwise isolate process spawning behind a tiny testable function.
-
-**DoD:** helper returns a parseable completion event for success and failure and never
-accepts a client-supplied executable.
-
-**Do not:** add cancellation or progress parsing in this step.
-
-### S29 — Implement the unprivileged helper client
-
-**Prerequisite:** S25, S28.
-
-**Goal:** let the main application invoke the installed helper through `pkexec`.
-
-**Allowed files:** `src/helper/client.rs`, `src/helper/mod.rs`, tests.
-
-**Implementation:**
-
-1. Serialize the typed request as JSONL on stdin.
-2. Invoke the fixed helper path through `pkexec`; do not allow the UI to choose a helper
-   path or pass arbitrary helper arguments.
-3. Parse only valid protocol events from stdout.
-4. Map pkexec authentication cancellation/refusal to `OperationError::AuthDenied`.
-5. Map missing helper and malformed protocol to explicit errors.
-
-**Validation:** unit tests for JSON encoding/decoding and fake process outputs. Do not
-require a real polkit prompt in CI.
-
-**DoD:** caller can request one typed DNF operation and receive a typed result.
-
-**Do not:** call DNF directly as root from the main GUI process.
-
-### S30 — Implement DNF install planning end to end
-
-**Prerequisite:** S23, S24.
-
-**Goal:** expose `plan_install(PkgId)` using the dry-run builder and parser.
-
-**Allowed files:** `src/backends/dnf/plan.rs`, DNF tests.
-
-**Implementation:**
-
-1. Validate selected IDs.
-2. Run the DNF simulation command using the ordinary unprivileged runner.
-3. Parse the full transaction result.
-4. Return a `PlanStep` containing selected targets and every known native change.
-5. If simulation fails, do not return an apparently valid empty plan.
-
-**Validation:** fake-runner end-to-end tests for successful plan, empty/no-op plan and
-native command failure.
-
-**DoD:** install planning is read-only and returns a truthful preview.
-
-**Do not:** call the helper or execute an install.
-
-### S31 — Implement DNF remove planning end to end
-
-**Prerequisite:** S30.
-
-**Goal:** expose `plan_remove(PkgId)` with dependency-removal visibility.
-
-**Allowed files:** `src/backends/dnf/plan.rs`, tests.
-
-**Implementation:**
-
-1. Validate selected installed package IDs.
-2. Run DNF's remove simulation.
-3. Parse packages DNF proposes to remove, including dependent packages if the native
-   output includes them.
-4. A plan with additional removals must list them; do not collapse them to one summary.
-5. If parsing is incomplete, mark the preview unavailable or fail closed.
-
-**Validation:** fixture tests for a simple removal, dependent removals and package-not-found.
-
-**DoD:** remove review can show the exact native removal set whenever DNF exposes it.
-
-**Do not:** add a force-remove option.
-
-### S32 — Apply an approved DNF install
-
-**Prerequisite:** S27, S28, S29, S30.
-
-**Goal:** execute install only after the user confirms a previously generated plan.
-
-**Allowed files:** `src/backends/dnf/transaction.rs` (or existing DNF module), helper client
-and targeted tests.
-
-**Implementation:**
-
-1. Keep the approved plan in the unprivileged process.
-2. On confirmation, extract the selected target IDs and send only those IDs to the helper.
-3. Helper revalidates the IDs and constructs `dnf5 install -y ...` (exact argv confirmed
-   against the supported DNF version).
-4. Do not pass a previously generated arbitrary argv from the plan to the helper.
-5. After success, refresh installed packages through the read-only catalog path.
-
-**Validation:** fake helper-client test; manual install in a disposable Fedora VM using a
-small known package; verify installed package appears in the catalog.
-
-**DoD:** install requires an explicit approved plan and helper validation; the GUI process
-never performs a privileged DNF write.
-
-**Do not:** implement remove apply or batch/cross-backend transactions.
-
-### S33 — Apply an approved DNF removal
-
-**Prerequisite:** S31, S32.
-
-**Goal:** execute removal only after reviewing all native-proposed removals.
-
-**Allowed files:** DNF transaction module and targeted tests.
-
-**Implementation:**
-
-1. Require the confirmed plan to match the pending plan ID and selected target IDs.
-2. Send the primary selected targets to the helper; do not allow the UI to add extra targets
-   that were not in the plan.
-3. The helper revalidates the identifiers and constructs the fixed DNF remove argv.
-4. DNF remains authoritative for dependency protection; do not add `--nodeps` or other
-   force flags.
-5. Refresh installed package state after success.
-
-**Validation:** fake tests for stale plan ID and mismatched target; manual remove of a
-reinstallable test package in a disposable VM.
-
-**DoD:** removal cannot bypass DNF dependency checks and cannot execute a stale/unreviewed
-plan.
-
-**Do not:** implement update-all or rollback.
-
-### S34 — Add DNF transaction errors and integration smoke test
-
-**Prerequisite:** S32, S33.
-
-**Goal:** make common native failures understandable and verify the real DNF vertical slice.
-
-**Allowed files:** `src/backends/dnf/error.rs`, targeted tests, `scripts/test-fedora.sh`,
-`docs/deviations.md` if needed.
-
-**Implementation:**
-
-1. Classify only well-supported signatures: lock/busy, dependency conflict, signature/key
-   issue, insufficient space, authentication cancelled and generic native failure.
-2. Keep classification in one function; do not scatter stderr matching across the backend.
-3. Add an integration script that checks DNF probe, installed list, search, plan install and
-   plan remove. A real install/remove test must require an explicit opt-in environment flag
-   and run only in a disposable VM.
-4. Record tested Fedora/DNF versions.
-
-**Validation:** `cargo test`; `cargo clippy --all-targets -- -D warnings`; read-only script
-on Fedora; opt-in transaction test only in disposable VM.
-
-**DoD:** G3 passes; expected failures produce typed errors; no test unexpectedly mutates the
-host package database.
-
-**Do not:** add Flatpak until G3 is reviewed.
-
----
-
-## Stage E — Flatpak catalog and operations
-
-**Goal:** add Flatpak as the second provider while keeping its distinct installation scope
-and authorization behavior visible.
-
-### S35 — Probe Flatpak availability and installation scope
-
-**Prerequisite:** G3.
-
-**Goal:** detect the Flatpak CLI and whether user/system installations exist.
-
-**Allowed files:** `src/backends/flatpak/mod.rs`, `probe.rs`, tests.
-
-**Implementation:**
-
-1. Probe `flatpak --version` with the normal runner.
-2. Determine available user/system installation scopes using supported read-only CLI output.
-3. Treat missing CLI/daemon as unavailable, not fatal to application startup.
-4. Return `BackendInfo` with only currently supported capabilities.
-
-**Validation:** fake-runner tests for missing CLI, successful CLI and failed probe.
-
-**DoD:** Flatpak detection works independently of the host distro and does not require root.
-
-**Do not:** implement list/search or assume Flathub is configured.
-
-### S36 — Parse installed Flatpak references
-
-**Prerequisite:** S35, S03.
-
-**Goal:** parse installed applications and runtimes while preserving scope.
-
-**Allowed files:** `src/backends/flatpak/parse.rs`, fixtures/tests.
-
-**Implementation:**
-
-1. Capture actual `flatpak list` output using the selected machine-readable format.
-2. Parse app/runtime kind, application ID, branch, architecture, origin and installation
-   scope where output exposes them.
-3. Encode installation scope plus full ref into `PkgId.native`.
-4. Do not assume two refs with the same application ID but different installations are the
-   same package.
-
-**Validation:** parser fixtures containing user and system installations, app and runtime,
-empty list and malformed output.
-
-**DoD:** parser is pure and preserves scope identity.
-
-**Do not:** deduplicate Flatpak refs with DNF packages.
-
-### S37 — Implement Flatpak installed listing
-
-**Prerequisite:** S36.
-
-**Goal:** expose installed Flatpak packages through the catalog adapter.
-
-**Allowed files:** `src/backends/flatpak/catalog.rs`, tests.
-
-**Implementation:**
-
-1. Run the selected `flatpak list` machine-readable format.
-2. Parse output through S36.
-3. Return both user and system packages if both scopes are present.
-4. Do not run the command through Paket's root helper.
-
-**Validation:** fake-runner test asserts exact argv and scope preservation.
-
-**DoD:** installed Flatpaks appear as individual provider rows.
-
-**Do not:** add search/details/update operations yet.
-
-### S38 — Implement Flatpak search
-
-**Prerequisite:** S37.
-
-**Goal:** search configured Flatpak remotes without making assumptions about Flathub.
-
-**Allowed files:** `src/backends/flatpak/catalog.rs`, parser/tests.
-
-**Implementation:**
-
-1. Capture output from the chosen `flatpak search` machine-readable form.
-2. Map app ID, branch, remote and available metadata.
-3. Preserve remote/ref identity in `PkgId`.
-4. Empty results are valid; remote/network errors are not empty results.
-
-**Validation:** fixtures for results from two remotes, no result and failed remote query.
-
-**DoD:** search returns provider-specific candidates and does not claim Flatpak is configured
-when no remotes exist.
-
-**Do not:** add a remote automatically or change trust settings.
-
-### S39 — Add Flatpak update listing and details
-
-**Prerequisite:** S37, S38.
-
-**Goal:** expose basic details and available updates.
-
-**Allowed files:** `src/core/model.rs`, Flatpak catalog/parser/tests.
-
-**Implementation:**
-
-1. Add only detail/update fields required by current UI/API needs.
-2. Use Flatpak's supported CLI output for installed refs and updates.
-3. Preserve user/system scope on update IDs.
-4. If the native output cannot classify a security update or download size, leave it unknown.
-
-**Validation:** fixtures for no updates, one update and missing optional metadata.
-
-**DoD:** updates can be listed without comparing versions across ecosystems.
-
-**Do not:** implement automatic background refresh.
-
-### S40 — Implement Flatpak install/remove
-
-**Prerequisite:** S38, S39.
-
-**Goal:** create an explicitly confirmable Flatpak action and install/remove a selected ref
-using Flatpak's own authorization mechanism.
-
-**Allowed files:** Flatpak transaction module, targeted tests.
-
-**Implementation:**
-
-1. Validate that the selected `PkgId` belongs to Flatpak and decode its full ref/scope.
-2. Construct a fixed Flatpak command from the validated ID.
-3. Respect user/system scope; do not silently switch scope.
-4. Invoke `flatpak install`/`uninstall` directly as the user. Allow Flatpak/polkit to request
-   authorization; do not run Flatpak inside `pkexec`.
-5. If plan preview uses a command that downloads objects into cache (for example a
-   no-deploy style preview), disclose that side effect and do not run it in the background.
-6. Build a `PlanStep` for the selected Flatpak ref. If no reliable native preview is
-   available, set `PlanPreview::Unavailable`, disclose that fact and still require the user
-   to review/confirm the exact selected ref and scope.
-
-**Validation:** fake-runner tests for scope, argv and invalid IDs; manual operation in a
-Fedora VM with Flatpak configured.
-
-**DoD:** Flatpak operations use native authorization and cannot target a different scope
-than the one selected.
-
-**Do not:** add/remove remotes or auto-accept signing keys.
-
-### S41 — Add Flatpak provider contract tests
-
-**Prerequisite:** S35–S40.
-
-**Goal:** verify the provider contract without requiring Flatpak to be installed.
-
-**Allowed files:** `tests/flatpak_catalog.rs`, fixtures/support.
-
-**Implementation:**
-
-1. Test probe, installed, search, details/update behavior and install/remove command
-   construction using the fake runner.
-2. Assert that Flatpak commands never use the Paket privileged helper.
-3. Assert scope is preserved in every relevant `PkgId` round-trip.
-
-**Validation:** `cargo test flatpak_catalog` on any Linux host.
-
-**DoD:** G4 provider tests pass; missing Flatpak does not break DNF.
-
-**Do not:** start the UI before S42–S45 stabilize the public core API.
-
----
-
-## Stage F — Core service and backend contract stabilization
-
-**Gate G4.** Complete S42–S45. This stage joins the two providers behind a
-small core interface. Keep it smaller than a framework.
-
-### S42 — Define the provider traits
-
-**Prerequisite:** S21, S41.
-
-**Goal:** define only the common provider operations used by the first UI.
-
-**Allowed files:** `src/core/traits.rs`, `src/core/mod.rs`, implementations/tests as needed.
-
-**Implementation:**
-
-1. Add `CatalogSource` for backend ID/info, installed list, search and details.
-2. Add `Installer` for plan and apply operations. Flatpak may report a less-complete plan
-   than DNF, but it must never fake a native preview.
-3. Keep capability differences in `BackendInfo`; do not create default no-op success
-   methods.
-4. Use the fake runner in tests; do not introduce a dependency-injection crate.
-
-**Validation:** compile both provider implementations through the traits.
-
-**DoD:** DNF and Flatpak can be called through the same catalog interface while preserving
-provider-specific IDs and errors.
-
-**Do not:** add methods for future features that no current backend needs.
-
-### S43 — Add a small core catalog service
-
-**Prerequisite:** S42.
-
-**Goal:** combine read-only results from available providers.
-
-**Allowed files:** `src/core/service.rs`, tests.
-
-**Implementation:**
-
-1. Add `installed_all()` that queries providers in deterministic order.
-2. Add `search_all(query)` that queries each provider and returns results grouped by
-   backend/provider without merging by display name.
-3. Preserve per-provider errors so one broken backend does not hide successful results
-   from another provider.
-4. Do not add background refresh, cache or worker threads in this task.
-
-**Validation:** tests where DNF succeeds and Flatpak fails, and the reverse; both result
-sets remain available with a provider-specific error.
-
-**DoD:** one provider failure does not fail the entire aggregate catalog.
-
-**Do not:** deduplicate app identities or create a cross-provider version comparator.
-
-### S44 — Add install/remove plan aggregation
-
-**Prerequisite:** S22, S30, S31, S40, S42.
-
-**Goal:** create a plan from one or more selected package IDs.
+**Prerequisite:** S027.
 
 **Allowed files:** `src/core/planner.rs`, tests.
 
-**Implementation:**
+**Implement:** add/remove/update operations to an in-memory draft basket. A click changes
+intent state only; it must not spawn a package-manager command.
 
-1. Group intents by `BackendId`.
-2. Ask each selected provider for its native plan.
-3. Keep plan steps ordered deterministically; do not run multiple native simulations in
-   parallel initially.
-4. Preserve each backend's preview quality and notes.
-5. Fail the requested plan clearly when a selected provider cannot produce a safe plan;
-   do not silently omit the selected package.
+**Validate:** tests for add, remove, clear, and update intent.
 
-**Validation:** tests for DNF-only, Flatpak-only and mixed-provider plan; verify mixed plan
-contains separate steps and no atomicity claim.
+**DoD:** package row actions can safely create pending intent.
 
-**DoD:** a plan accurately represents every selected backend action.
+**Do not:** resolve dependencies.
 
-**Do not:** implement transaction execution in this task.
+### S029 — De-duplicate identical intents
 
-### S45 — Add sequential executor and contract tests
+**Prerequisite:** S028.
 
-**Prerequisite:** S43, S44.
+**Allowed files:** `src/core/planner.rs`, tests.
 
-**Goal:** apply approved plan steps sequentially and report partial outcomes honestly.
+**Implement:** de-duplicate identical action+package+scope intents. Preserve separate IDs
+when backend/source/architecture differs.
 
-**Allowed files:** `src/core/executor.rs`, `tests/backend_contract.rs`, tests.
+**Validate:** duplicate and distinct-source identity tests.
 
-**Implementation:**
+**DoD:** repeated install clicks cannot create duplicate native targets.
 
-1. Execute one backend step at a time in plan order.
-2. Stop on first failure by default; retain the results of completed steps.
-3. Do not attempt rollback of already-completed steps.
-4. Report success/failure per step; never label a partially-applied plan as fully successful.
-5. Add common contract assertions for package identity, capability truthfulness and error
-   handling.
+**Do not:** silently discard meaningful source differences.
 
-**Validation:** fake providers prove ordering, stop-on-failure and partial outcome behavior.
+### S030 — Detect contradictory intents
 
-**DoD:** G4 passes. Backend API is stable enough to build a UI without depending on DNF or
-Flatpak concrete types.
+**Prerequisite:** S028.
 
-**Do not:** add a database journal or persistent cache yet.
+**Allowed files:** `src/core/planner.rs`, tests.
+
+**Implement:** detect install/remove or update/downgrade conflicts for the same exact
+package/scope. Return a typed conflict requiring user resolution.
+
+**Validate:** conflict matrix tests.
+
+**DoD:** Paket never guesses which contradictory action wins.
+
+**Do not:** invent precedence based on click order.
+
+### S031 — Group intents by backend and scope
+
+**Prerequisite:** S029–S030.
+
+**Allowed files:** `src/core/planner.rs`, tests.
+
+**Implement:** group compatible intents by `(BackendId, InstallationScope)` and preserve a
+deterministic order. Keep each group's target list intact for one native solver invocation.
+
+**Validate:** same-backend grouping and cross-backend separation tests.
+
+**DoD:** multiple package clicks on the same backend become one transaction candidate.
+
+**Do not:** execute groups concurrently.
+
+### S032 — Build a cross-backend batch plan
+
+**Prerequisite:** S031.
+
+**Allowed files:** `src/core/planner.rs`, `src/core/transaction.rs`.
+
+**Implement:** represent a batch as ordered backend plan steps, dependencies between steps
+only when explicitly declared, and a non-atomic batch flag. Default behavior is fail-stop:
+on one step's failure, mark later steps skipped pending review.
+
+**Validate:** plan ordering and failure summary tests.
+
+**DoD:** a multi-backend plan cannot be represented as one atomic transaction.
+
+**Do not:** add rollback promises.
+
+### S033 — Implement one-active-mutation coordinator
+
+**Prerequisite:** S032.
+
+**Allowed files:** `src/runtime/scheduler.rs`, tests.
+
+**Implement:** FIFO queue for mutation batches with a single active writer globally.
+Repeated clicks enqueue intent; they do not spawn parallel writers. Support queue position,
+queued time, and explicit user cancellation while pending.
+
+**Validate:** concurrent submit test proves max active mutations is exactly one.
+
+**DoD:** no two Paket-owned system mutations run simultaneously.
+
+**Do not:** add per-backend parallel mutation optimization.
+
+### S034 — Add bounded read scheduler
+
+**Prerequisite:** S024, S033.
+
+**Allowed files:** `src/runtime/scheduler.rs`, tests.
+
+**Implement:** limit discovery/search/read work to four concurrent tasks initially; make the
+limit configurable internally. Prevent same-backend reads from returning an older cache
+snapshot while its mutation is running.
+
+**Validate:** concurrency counter tests.
+
+**DoD:** read concurrency is bounded and UI requests do not create unbounded tasks.
+
+**Do not:** run writes through this read scheduler.
+
+### S035 — Add backend resource lock keys
+
+**Prerequisite:** S033.
+
+**Allowed files:** `src/core/transaction.rs`, `src/runtime/scheduler.rs`.
+
+**Implement:** introduce internal resource keys for system package DB, per-user Flatpak
+installation, system Flatpak, snapd, and Paket AppImage store. Use them for future scheduling
+and state invalidation; the release default remains one global mutation writer.
+
+**Validate:** key equality and lock ownership tests.
+
+**DoD:** resource contention is explicit, not inferred from UI state.
+
+**Do not:** enable parallel writes yet.
+
+### S036 — Classify external package-manager contention
+
+**Prerequisite:** S033, S035.
+
+**Allowed files:** `src/runtime/scheduler.rs`, `src/core/error.rs`.
+
+**Implement:** classify known native lock/busy responses as `Busy/WaitingForExternalManager`.
+Allow cancellable wait with bounded backoff where native tool supports it. Never delete
+lock files or attempt to bypass database locks.
+
+**Validate:** fake responses for lock-held and ordinary command failure.
+
+**DoD:** a running GNOME Software/apt/pacman/dnf transaction is shown as contention.
+
+**Do not:** inspect and remove stale locks manually.
+
+### S037 — Implement mutation state transitions
+
+**Prerequisite:** S033.
+
+**Allowed files:** `src/core/transaction.rs`, tests.
+
+**Implement:** validate allowed transitions: Draft -> Planning -> AwaitingReview -> Queued
+-> Running -> Succeeded/Failed/CancelRequested/Cancelled/NeedsReconciliation. Reject invalid
+transitions.
+
+**Validate:** transition table tests.
+
+**DoD:** impossible states cannot be set silently.
+
+**Do not:** add a UI-specific state machine.
+
+### S038 — Implement batch stop-on-failure semantics
+
+**Prerequisite:** S032, S037.
+
+**Allowed files:** `src/runtime/scheduler.rs`, tests.
+
+**Implement:** after a failed/unknown backend step, stop later steps, preserve successful
+ones, mark the rest skipped, and request provider refresh before the user can re-plan.
+
+**Validate:** test success -> failure -> skipped sequence.
+
+**DoD:** partial success is represented accurately.
+
+**Do not:** automatically retry writes.
+
+### S039 — Reconcile interrupted transactions on next launch
+
+**Prerequisite:** S026, S037.
+
+**Allowed files:** `src/app/coordinator.rs`, `src/core/transaction.rs`, tests.
+
+**Implement:** mark persisted Running/CancelRequested states as Interrupted/Unknown after
+restart. Re-query provider state and show observed results. Never replay the transaction.
+
+**Validate:** simulate persisted active task followed by app startup.
+
+**DoD:** Paket never assumes a transaction succeeded or failed solely from stale local state.
+
+**Do not:** run a repair or reinstall automatically.
 
 ---
 
-## Stage G — Minimal Slint UI
+## Stage D — Host detection and provider registry
 
-**Gate G5.** Only start after G4. Build one working workflow at a time. Do not
-try to create a polished app shell and all screens in one task.
+**Gate G3.** Paket can explain which backends are present, absent, unsupported, or detected
+but not qualified.
 
-### S46 — Add Slint build integration
+### S040 — Parse `/etc/os-release` safely
 
-**Prerequisite:** G4.
+**Prerequisite:** S004.
 
-**Goal:** compile a minimal Slint window without connecting backend state.
+**Allowed files:** `src/platform/os_release.rs`, fixtures/tests.
 
-**Allowed files:** `Cargo.toml`, `build.rs`, `src/main.rs`, `ui/app.slint`.
+**Implement:** parse key/value lines and quoted values without sourcing or executing the file.
+Extract ID, ID_LIKE, VERSION_ID, PRETTY_NAME, VARIANT_ID where present.
 
-**Implementation:**
+**Validate:** Fedora, Ubuntu, Debian, Arch, openSUSE and malformed fixtures.
 
-1. Pin Slint `=1.19.0` and Slint Kit `=0.9.0` as researched in the original plan.
-2. Add the Slint Kit build integration using the official setup matching those versions.
-3. Isolate Kit-specific imports under `ui/components/`; do not spread `@kit` imports into
-   view code.
-4. Add a window containing only a title and a placeholder body.
-5. Document the Slint Kit license implications in the project README/license notes before
-   distributing a binary.
+**DoD:** parser is pure and never panics on malformed input.
 
-**Validation:** `cargo check --features gui`; run the app and verify the window opens.
+**Do not:** enable providers directly from distro ID.
 
-**DoD:** minimal GUI builds and launches on the target Fedora desktop.
+### S041 — Add HostProfile model
 
-**Do not:** add models, navigation, package lists or backend calls.
+**Prerequisite:** S040.
 
-### S47 — Create the application shell
+**Allowed files:** `src/platform/host.rs`, tests.
 
-**Prerequisite:** S46.
+**Implement:** represent distro family/version, architecture, immutable/atomic hints,
+container/chroot hints where detectable, and qualification state.
 
-**Goal:** add static navigation and an empty content area.
+**Validate:** serialization and unknown-host tests.
 
-**Allowed files:** `ui/app.slint`, one small navigation component, related theme file.
+**DoD:** unsupported hosts remain representable.
 
-**Implementation:**
+**Do not:** claim distro aliases guarantee compatibility.
 
-1. Add navigation entries for Browse, Installed and Updates.
-2. Add a content panel that changes its placeholder title when navigation changes.
-3. Keep navigation state local to Slint for this task.
-4. Use simple layout primitives; no animation or complex component framework.
+### S042 — Probe executable versions
 
-**Validation:** manual click-through of all navigation entries.
+**Prerequisite:** S017, S041.
 
-**DoD:** all three views can be selected and render the correct placeholder.
+**Allowed files:** `src/platform/probe.rs`, tests.
 
-**Do not:** connect the backend or create detailed design polish.
+**Implement:** safe executable lookup and bounded version probes. Store absolute executable
+path after validation; do not trust a UI-supplied PATH or executable.
 
-### S48 — Add the Rust/UI message bridge
+**Validate:** fake runner for missing executable, valid version and malformed output.
 
-**Prerequisite:** S47.
+**DoD:** provider can distinguish missing command from unsupported version.
 
-**Goal:** move requests/events between the Slint thread and the backend worker.
+**Do not:** run package operations.
 
-**Allowed files:** `Cargo.toml`, `src/ui/mod.rs`, `src/ui/bridge.rs`, `src/main.rs`.
+### S043 — Detect D-Bus and system service availability
 
-**Implementation:**
+**Prerequisite:** S042.
 
-1. Add `crossbeam-channel` in this task if the standard library channels are insufficient;
-   justify the dependency in the progress note. Create request and event channels using
-   the selected channel implementation.
-2. Start exactly one worker thread that owns the core service.
-3. UI sends requests; worker sends typed events. Worker never touches Slint objects.
-4. Drain events on the UI thread using a Slint timer (50–100 ms is sufficient initially).
-5. Do not block the UI thread on a backend command.
+**Allowed files:** `src/platform/probe.rs`, tests.
 
-**Validation:** a test or manual debug action sends a ping request and receives a response;
-window remains responsive.
+**Implement:** probe only documented service names/objects needed by DNF5, Flatpak and
+snapd. A missing optional service removes only its capability.
 
-**DoD:** bridge works without any package-manager call from the UI thread.
+**Validate:** fixtures/mocks for absent and present service.
 
-**Do not:** add progress streaming or multiple worker pools.
+**DoD:** service absence is a normal capability state.
 
-### S49 — Show installed packages
+**Do not:** add raw D-Bus calls to UI code.
 
-**Prerequisite:** S48.
+### S044 — Define tested host support matrix
 
-**Goal:** render installed packages in a simple list.
+**Prerequisite:** S041–S043.
 
-**Allowed files:** `ui/views/installed.slint`, UI model bindings, bridge event handling.
+**Allowed files:** `docs/support-matrix.md`.
 
-**Implementation:**
+**Implement:** list distro/version/architecture/provider/minimum native-tool versions and
+VM qualification status. Include unsupported/untested states and last-tested date.
 
-1. Add a Rust request for installed packages.
-2. Worker calls `installed_all()` and returns rows plus provider errors.
-3. Render package name, version, backend/source and installed state.
-4. Use stable `PkgId`-derived keys, never row indexes as identity.
-5. Show empty, loading and provider-error states.
+**Validate:** manual review against CI VM images.
 
-**Validation:** manual Fedora test with both DNF and Flatpak installed; test with one provider
-unavailable.
+**DoD:** public support claims can be traced to tested matrix entries.
 
-**DoD:** installed list loads asynchronously and one provider's failure does not blank the
-other provider's results.
+**Do not:** infer support for all RPM/DEB systems.
 
-**Do not:** add icons, app grouping or infinite scrolling.
+### S045 — Define narrow provider contracts and registry
 
-### S50 — Add search UI
+**Prerequisite:** S011, S024, S042.
 
-**Prerequisite:** S49.
+**Allowed files:** `Cargo.toml`, `src/backends/traits.rs`, `src/core/registry.rs`, tests.
 
-**Goal:** search both current providers and display results.
+**Implement:** add the small `async-trait` dependency so async provider methods remain
+object-safe. Define only two provider ports: `CatalogBackend` for probe/list/search/details/
+updates and `TransactionBackend` for plan/apply. Use `SearchScope`, `UpdateRecord`,
+`BackendPlan`, `BackendOutcome`, `PlanError`, `OperationError`, and `EventSink` already
+introduced by earlier tasks. Registry stores static `Arc<dyn ...>` provider implementations
+and descriptors in deterministic order. Keep unavailable providers visible with a reason.
 
-**Allowed files:** Browse view, bridge request/event types, focused tests.
+**Validate:** one fake read-only provider and one fake transaction provider implement the
+ports; test registry lookup, missing capability, and deterministic ordering.
 
-**Implementation:**
+**DoD:** provider contracts are small and object-safe; no plugin loader or DI framework is
+needed.
 
-1. Add a search input and submit/debounce behavior.
-2. Send search requests to the worker; do not call a backend from a Slint callback.
-3. Keep each result's backend visible so identical names remain separate choices.
-4. Add a simple request sequence number; ignore responses from an older query after a newer
-   query has been submitted.
-5. Preserve the last results while a new query is loading.
+### S046 — Add startup provider probing coordinator
 
-**Validation:** search common packages; rapidly change query and verify stale results do
-not replace newer ones.
+**Prerequisite:** S043–S045.
 
-**DoD:** search remains responsive and source identity is visible.
+**Allowed files:** `src/app/coordinator.rs`, tests.
 
-**Do not:** implement global app deduplication or remote search suggestions.
+**Implement:** run backend probes concurrently under read concurrency limit, publish
+incremental results, and isolate one provider's failure from all others.
 
-### S51 — Add package details view
+**Validate:** fake provider test with one success and one failure.
 
-**Prerequisite:** S50.
+**DoD:** one broken/missing backend cannot prevent Paket startup.
 
-**Goal:** show details for a selected package without performing mutations.
+**Do not:** block startup waiting for remote repository refresh.
 
-**Allowed files:** details component/view, UI state and bridge event mapping.
+### S047 — Detect immutable/atomic hosts explicitly
 
-**Implementation:**
+**Prerequisite:** S041.
 
-1. Selection stores the full `PkgId`, not the package row index.
-2. Request details from the corresponding provider.
-3. Show available details and explicitly omit unavailable values.
-4. Handle package disappearing between list and detail query.
+**Allowed files:** `src/platform/host.rs`, fixtures/tests.
 
-**Validation:** select DNF and Flatpak results with the same display name; verify correct
-provider details are shown.
+**Implement:** detect known rpm-ostree/bootc-like host markers without treating them as
+ordinary mutable Fedora/DNF hosts. Keep exact distro identity separate from deployment
+manager.
 
-**DoD:** selection and details are identity-safe.
+**Validate:** Fedora Workstation vs Silverblue-like fixture tests.
 
-**Do not:** add an install button in this task.
+**DoD:** provider selection does not expose normal DNF writes on an immutable host.
 
-### S52 — Add plan review UI
+**Do not:** run `rpm-ostree` commands yet.
 
-**Prerequisite:** S51, S44.
+### S048 — Detect externally running package-manager processes
 
-**Goal:** let the user request a plan and review changes before confirmation.
+**Prerequisite:** S042.
 
-**Allowed files:** plan review view/component, bridge request/event mapping.
+**Allowed files:** `src/platform/probe.rs`, tests.
 
-**Implementation:**
+**Implement:** add conservative process/service hints for common package managers. Treat
+this as a UX hint only; native lock errors remain authoritative.
 
-1. Add an action to request an install/remove plan for the selected `PkgId`.
-2. Show targets separately from solver-resolved dependency changes.
-3. Show preview quality (`Native`, `Estimated`, `Unavailable`) and notes.
-4. Require an explicit confirmation action; do not apply from the package details view.
-5. Disable confirmation when planning failed or the plan is stale.
+**Validate:** process fixture tests.
 
-**Validation:** test DNF native preview and Flatpak unavailable/limited preview cases.
+**DoD:** no code assumes process scan replaces native lock handling.
 
-**DoD:** user can inspect the plan before any mutation begins.
-
-**Do not:** execute operations in this task.
-
-### S53 — Add apply progress and result view
-
-**Prerequisite:** S52, S45.
-
-**Goal:** apply only the confirmed plan and show the outcome.
-
-**Allowed files:** progress/result views, bridge event mapping, focused tests.
-
-**Implementation:**
-
-1. Confirmation sends `Apply(plan_id)`; backend re-checks that the plan exists and is current.
-2. Show running state, current backend/action and textual status.
-3. Show success/failure for each plan step; represent partial success clearly.
-4. Disable duplicate apply while a transaction is active.
-5. Refresh installed/update data after completion.
-
-**Validation:** fake-provider success, first-step failure and later-step failure; manual
-Fedora install/remove workflow in disposable VM.
-
-**DoD:** G5 passes; no package operation can be triggered without plan review and confirmation.
-
-**Do not:** add activity history, settings or auto-updates.
-
-### S54 — Run the initial end-to-end acceptance checklist
-
-**Prerequisite:** S46–S53.
-
-**Goal:** validate the first usable DNF + Flatpak application as one product.
-
-**Allowed files:** `scripts/test-fedora.sh`, `docs/acceptance.md`, bug fixes limited to
-failures found by the checklist.
-
-**Implementation:**
-
-1. Verify clean start when DNF or Flatpak is missing.
-2. Verify installed list, search, details, plan review, install/remove and refresh.
-3. Verify DNF helper requires authorization and rejects malformed requests.
-4. Verify Flatpak's own polkit behavior is used and it is not invoked via Paket helper.
-5. Verify identical package names remain distinct by provider.
-6. Record Fedora version, DNF5 version and Flatpak version used for acceptance.
-
-**Validation:** run the checklist in a disposable Fedora VM; run `cargo test`, `cargo fmt
---check` and `cargo clippy --all-targets -- -D warnings`.
-
-**DoD:** initial MVP is accepted or every failed acceptance item is recorded as a separate
-follow-up task. Do not conceal failures by relaxing acceptance criteria.
-
-**Do not:** start APT/Pacman/Snap/AppImage in the same task.
+**Do not:** kill or signal external package-manager processes.
 
 ---
 
-# 5. Additional backend task packs
+## Stage E — DNF5 provider (Fedora / DNF5 hosts)
 
-These are intentionally separate from the first usable slice. Add one provider at a time.
-Reuse the common contracts but do not assume command syntax, transaction preview quality,
-privilege flow or package identity is identical between ecosystems.
+**Gate G4.** DNF5 has real catalog, updates, transaction resolution and mutation through a
+supported authorization path.
 
-## Pack A — APT / DEB (Debian and Ubuntu)
+### S049 — Create DNF5 provider skeleton
 
-### S55 — Detect APT-capable hosts
+**Prerequisite:** G3.
 
-Probe `/etc/os-release`, `apt-get`, `apt-cache` and `dpkg-query`. Return an unavailable
-reason on unsupported hosts. Do not run an update or install. Add fake-runner tests.
+**Allowed files:** `src/backends/mod.rs`, `src/backends/dnf5/mod.rs`.
 
-**DoD:** Debian/Ubuntu compatibility detection is isolated and does not affect Fedora.
+**Implement:** create provider type and register its identity/capability placeholder.
 
-### S56 — Parse installed dpkg records
+**Validate:** compilation and registry unit test.
 
-Capture `dpkg-query -W` with an explicit tab-separated format. Parse package name,
-architecture, version and status. Only status `install ok installed` means installed.
-Add fixtures for installed, removed, half-configured and multiarch records.
+**DoD:** provider is isolated from DNF4 and raw RPM logic.
 
-**DoD:** parser is pure and does not mislabel dpkg's residual/config-only records as installed.
+**Do not:** add commands.
 
-### S57 — Implement APT installed listing and search
+### S050 — Probe DNF5 and supported version
 
-Use `dpkg-query` for installed state and `apt-cache search` for candidates. Parse output in
-separate pure functions. Keep installed package identity distinct from candidate identity.
+**Prerequisite:** S049.
 
-**DoD:** installed/search work through the common catalog API with fake-runner tests.
+**Allowed files:** `src/backends/dnf5/probe.rs`, tests.
 
-### S58 — Implement APT package details and update listing
+**Implement:** require a supported DNF5-capable mutable host, detect `dnf5`, parse version,
+and detect `dnf5daemon-server` D-Bus service. Expose read and write capabilities separately.
 
-Use `apt-cache show` for details and the researched simulation/list path for candidate
-updates. Do not compare Debian versions with RPM/Flatpak versions. Missing security data
-remains unknown.
+**Validate:** Fedora fixture + missing DNF5 + missing daemon tests.
 
-**DoD:** details/updates have fixtures and a real read-only Debian VM smoke test.
+**DoD:** unsupported/minimal Fedora host has a clear capability explanation.
 
-### S59 — Implement APT install/remove simulations
+**Do not:** classify DNF4 as DNF5.
 
-Use `apt-get -s` for install/remove/upgrade previews. Parse `Inst`, `Remv` and relevant
-summary lines. Mark preview incomplete/unavailable if the complete effect list cannot be
-parsed. A simulation is not a guarantee the later transaction is unchanged.
+### S051 — Parse DNF5 installed JSON fixture
 
-**DoD:** plan includes native dependency effects or explicitly reports preview limitations.
+**Prerequisite:** S009, S050.
 
-### S60 — Extend the helper with APT operations
+**Allowed files:** `src/backends/dnf5/parse.rs`, `tests/fixtures/dnf5/installed.json`.
 
-Add only typed APT install/remove/update operations to the helper. Validate package IDs,
-construct fixed argv and set the documented noninteractive environment/conffile policy.
-Never accept arbitrary argv. Preserve apt/dpkg lock errors. Do not add source mutation.
+**Implement:** capture actual output from the minimum supported DNF5 version. Map only
+fields verified from the command's JSON schema. Preserve NEVRA/architecture identity.
 
-**DoD:** helper tests reject malformed requests; real mutation tests pass only in a disposable
-Debian/Ubuntu VM; modified-conffile policy is documented.
+**Validate:** normal, empty, missing optional field, malformed JSON tests.
 
-### S61 — Add APT provider contract and VM tests
+**DoD:** pure parser with fixture provenance recorded.
 
-Run the shared catalog/installer contract tests with APT fixtures and a Debian-family VM.
-Verify missing/unsupported hosts do not break other providers.
+**Do not:** invent output fields from memory.
 
-**DoD:** APT is independently enabled/disabled by probe and its tested capability matrix is
-recorded.
+### S052 — Implement DNF5 installed listing
 
-## Pack B — Pacman (Arch-compatible systems)
+**Prerequisite:** S051.
 
-### S62 — Detect Pacman hosts and list installed packages
+**Allowed files:** `src/backends/dnf5/catalog.rs`.
 
-Probe Arch-compatible distro identity and `pacman`. Parse installed package data from
-`pacman -Qi` key/value blocks. Preserve package name/version/architecture and handle
-multi-line descriptions safely.
+**Implement:** build verified `dnf5 list --installed --json` invocation; execute via runner;
+parse using S051. Unprivileged read-only.
 
-**DoD:** installed listing works on Arch VM and parser fixtures cover multiple package blocks.
+**Validate:** fake-runner exact argv/env and result tests; manual Fedora check.
 
-### S63 — Implement Pacman search and package details
+**DoD:** listing distinguishes successful empty list from command failure.
 
-Use `pacman -Ss` and `pacman -Si`; parse repository/name identity without conflating
-same-name packages from different repositories.
+**Do not:** parse terminal tables.
 
-**DoD:** search/details use fake-runner fixtures and preserve repository identity.
+### S053 — Parse DNF5 repoquery records
 
-### S64 — Implement Pacman update listing
+**Prerequisite:** S051.
 
-Use `checkupdates` when available or the researched non-mutating update-list command.
-Never run `pacman -Sy` as a standalone refresh/install preparation step.
+**Allowed files:** `src/backends/dnf5/parse.rs`, query fixtures.
 
-**DoD:** updates list is read-only and clearly reports missing optional tooling.
+**Implement:** verify `repoquery --queryformat` against installed DNF5 help/man page. Use
+stable fields such as full NEVRA, repo ID, name, EVR and architecture with strict delimiter
+handling.
 
-### S65 — Implement Pacman plan preview
+**Validate:** real captured fixture plus malformed/duplicate candidate tests.
 
-Use `pacman --print` / `--print-format` for install/remove previews where supported. All
-install/update paths must use a full system upgrade (`-Syu`) to avoid partial-upgrade
-hazards. Parse the full removal set before allowing removal.
+**DoD:** parser preserves multiple repository candidates with same name.
 
-**DoD:** preview shows all native changes or is explicitly marked unavailable.
+**Do not:** assume repoquery supports JSON unless the supported version proves it.
 
-### S66 — Extend helper for Pacman transactions
+### S054 — Implement DNF5 search
 
-Add fixed typed operations for install/remove/full-upgrade. The helper validates native IDs
-and never offers a partial-upgrade operation. No `--nodeps` or force bypass.
+**Prerequisite:** S053.
 
-**DoD:** commands are covered by exact argv tests and VM transaction tests.
+**Allowed files:** `src/backends/dnf5/catalog.rs`.
 
-### S67 — Add Pacman contract and Arch VM tests
+**Implement:** search with verified repoquery argv. Query remains one argv element; preserve
+candidate ID and repo provenance.
 
-Run shared provider tests on an Arch-compatible VM. Record behavior differences for
-Manjaro/other derivatives rather than assuming all Arch derivatives are identical.
+**Validate:** fake-runner tests for query containing spaces, no results and command failure.
 
-**DoD:** Pacman availability and supported distro set are evidence-based.
+**DoD:** search cannot turn user query text into command syntax.
 
-## Pack C — AUR (separate from Pacman)
+**Do not:** deduplicate by package display name.
 
-### S68 — Implement AUR RPC search/details
+### S055 — Implement DNF5 package details
 
-Use the official AUR RPC v5 API through blocking HTTPS. Parse search/info responses into
-AUR candidates. Cache only if needed; initially a small in-memory cache is enough.
+**Prerequisite:** S052–S054.
 
-**DoD:** search/details work without an AUR helper installed and without root.
+**Allowed files:** `src/backends/dnf5/catalog.rs`, parser/tests.
 
-### S69 — Detect supported AUR helper
+**Implement:** use verified info/repoquery fields for description, repo, license, URL, size
+and dependency info where actually available. Decode only validated DNF5 PackageIds.
 
-Probe `paru` and `yay` independently and report which one is available. Do not assume one
-is installed because the host is Arch.
+**Validate:** wrong backend, wrong architecture, removed package and partial metadata tests.
 
-**DoD:** AUR install capability is exposed only when a supported helper exists.
+**DoD:** details return provenance and optional fields without fabricated defaults.
 
-### S70 — Add explicit AUR build/install flow
+**Do not:** enrich from unverified web metadata.
 
-AUR builds execute as the logged-in user, never through `pkexec` and never as root. Require
-an explicit warning/review step for PKGBUILD/build scripts. If a safe interactive review
-flow cannot be implemented, keep install disabled and provide a clear reason. Do not build
-a sandbox in this task pack.
+### S056 — Implement DNF5 update listing
 
-**DoD:** no AUR build command is executed with effective UID 0; test with a disposable Arch
-user account.
+**Prerequisite:** S051.
 
-## Pack D — Snap
+**Allowed files:** `src/backends/dnf5/catalog.rs`, parser/tests.
 
-### S71 — Probe Snap and list installed snaps
+**Implement:** capture and parse the supported DNF5 JSON upgrade output (or documented
+repoquery upgrade output if more reliable). Keep current and candidate version strings
+opaque.
 
-Probe the CLI and snapd availability separately. Parse installed snaps and channels using
-machine-readable output where available. Missing snapd is an unavailable backend, not a
-startup error.
+**Validate:** empty, normal, malformed fixtures.
 
-**DoD:** list/probe works on a supported Snap host and does not assume Fedora/Ubuntu has
-Snap installed.
+**DoD:** successful no-updates differs from update-query failure.
 
-### S72 — Implement Snap search and update listing
+**Do not:** globally compare DNF versions with other providers.
 
-Use Snap's supported CLI/API output; preserve channel, publisher and confinement metadata
-where available. Leave unavailable fields unknown.
+### S057 — Implement DNF5 repository listing
 
-**DoD:** search/update parser has captured fixtures and no network/tool failure is reported
-as an empty result.
+**Prerequisite:** S050.
 
-### S73 — Implement Snap install/remove using snapd authorization
+**Allowed files:** `src/backends/dnf5/catalog.rs`, parser/tests.
 
-Use the Snap client normally so snapd/polkit owns authorization. Do not invoke it through
-Paket's root helper. Model snapd change IDs/status and cancellation according to supported
-APIs; do not kill a socket request and claim that the Snap operation was cancelled.
+**Implement:** use documented `dnf5 repo list/info --json` output for ID, name, enabled
+state and verified optional fields.
 
-**DoD:** install/remove and cancellation behavior are verified on a Snap-enabled VM.
+**Validate:** enabled/disabled/malformed fixture tests.
 
-## Pack E — AppImage local applications
+**DoD:** source records preserve native repository ID.
 
-### S74 — Define the managed AppImage directory and record model
+**Do not:** add/edit repository config.
 
-Choose one per-user managed directory using the platform directories API. Add a small local
-record containing canonical managed path, display name and optional version/icon metadata.
-No repository or package-solver abstraction is implied.
+### S058 — Add zbus DNF5 daemon session client
 
-**DoD:** path resolution is deterministic and cannot escape the managed directory.
+**Prerequisite:** S050, S013.
 
-### S75 — List and import AppImages safely
+**Allowed files:** `src/backends/dnf5/daemon.rs`, `Cargo.toml`.
 
-Allow the user to explicitly select a file and copy it into the managed directory. Do not
-execute an untrusted AppImage to inspect metadata. Do not auto-mount or run embedded
-`--appimage-extract` code as part of a background scan. Extract metadata only through a
-reviewed, non-executing and bounded parser; otherwise leave it unknown.
+**Implement:** add zbus with Tokio support; open/close DNF5 daemon sessions; set bounded
+method timeouts; map missing service and D-Bus errors to typed backend errors.
 
-**DoD:** imports are explicit, paths are canonicalized, and listing never executes files.
+**Validate:** mock/session tests or a Fedora VM smoke test.
 
-### S76 — Remove and launch managed AppImages
+**DoD:** D-Bus lifetime and error handling are isolated from catalog parsing.
 
-Remove only records/files whose canonical paths remain inside the managed directory.
-Launching is a separate explicit user action; pass a selected path directly to process
-execution without a shell. Do not claim dependency management or package updates.
+**Do not:** implement transaction resolution yet.
 
-**DoD:** traversal/symlink tests prevent deleting outside the managed root; launching uses
-argv and never shell interpolation.
+### S059 — Resolve DNF5 install/remove plans
+
+**Prerequisite:** S058, S012.
+
+**Allowed files:** `src/backends/dnf5/daemon.rs`, `src/backends/dnf5/plan.rs`.
+
+**Implement:** open a session, add exact package specs to the documented DNF5 Goal/RPM
+interface, call resolve, and map the returned native transaction list to `BackendPlan`.
+Keep dependencies, removals, upgrades, and solver problems. Store a server/session token
+only for the approved plan lifecycle.
+
+**Validate:** Fedora VM plan for one package, dependency package, conflict and no-op.
+
+**DoD:** preview is native and complete only when the daemon reports a complete resolution.
+
+**Do not:** execute the transaction.
+
+### S060 — Execute DNF5 plan with progress and authorization
+
+**Prerequisite:** S059.
+
+**Allowed files:** `src/backends/dnf5/daemon.rs`, `src/backends/dnf5/progress.rs`.
+
+**Implement:** after explicit review, call documented transaction method; subscribe to
+transaction start/action progress/script events and completion; use polkit authorization
+provided by the daemon. Reconcile final installed state after success/failure.
+
+**Validate:** Fedora VM install/remove, authorization denied, external lock, and interrupted
+client tests.
+
+**DoD:** UI receives structured transaction progress and final outcome.
+
+**Do not:** add a second Paket root helper path for the same DNF5 operation.
 
 ---
 
-# 6. Shared improvements after providers are stable
+## Stage F — Flatpak provider
 
-These are optional enhancements. They must not block the first usable application.
+**Gate G5.** Flatpak apps and runtimes can be listed, searched, planned, installed, removed,
+and distinguished by installation scope.
 
-### S77 — Add a small persistent catalog cache
+### S061 — Probe Flatpak and enumerate installations
 
-Cache successful installed/catalog results in a simple versioned JSON file under the
-per-user application data directory. Write to a temporary file and atomically rename.
-Treat malformed/stale cache as a miss. Do not cache privileged credentials or native
-transaction plans. Add this only after the live API is stable.
+**Prerequisite:** G3.
 
-**DoD:** app can display last known installed list immediately and refreshes it in background
-without blocking the UI.
+**Allowed files:** `src/backends/flatpak/probe.rs`.
 
-### S78 — Add AppStream display enrichment
+**Implement:** detect `flatpak`, supported version, user installation and configured system
+installations. Report missing CLI separately from missing remotes.
 
-Parse only needed AppStream fields (desktop ID, localized name, summary, categories and icon
-reference). Use it only for presentation/grouping. Never use AppStream ID as an install ID
-or silently choose between DNF/Flatpak/AUR sources. Bound file size, decompressed size and
-record count; atomically replace the cache after a successful build.
+**Validate:** fake-runner fixtures and manual host probe.
 
-**DoD:** AppStream failure does not prevent package management; same app from multiple
-providers still requires an explicit source selection.
+**DoD:** no Flatpak installation does not break other providers.
 
-### S79 — Add read-only sources view
+**Do not:** assume only one system installation exists.
 
-Show configured DNF/APT/Pacman repositories, Flatpak remotes and Snap sources where the
-native CLI supports reliable read-only listing. Do not add/edit/remove sources in this
-release. Never import signing keys automatically.
+### S062 — Parse Flatpak refs and identity
 
-**DoD:** view reports observed native configuration and exposes no mutation controls.
+**Prerequisite:** S008, S061.
 
-### S80 — Add transaction activity log
+**Allowed files:** `src/backends/flatpak/parse.rs`.
 
-Write a small append-only JSONL log containing timestamp, provider, action, selected IDs,
-result and a bounded diagnostic tail. Do not store secrets or environment variables. Avoid
-building a database for the first version.
+**Implement:** parse full ref (kind, app/runtime ID, architecture, branch), remote, and
+installation identity. Use a verified machine-readable/column output supported by the
+minimum Flatpak version.
 
-**DoD:** activity survives app restarts and malformed trailing log entries do not crash load.
+**Validate:** app/runtime and same-ID multi-branch fixtures.
 
-### S81 — Add basic settings
+**DoD:** Flatpak identity includes scope and full native ref.
 
-Only add settings after a real setting exists. Use a small TOML file for theme preference,
-cache retention and default provider ordering. Validate values and fall back to defaults on
-invalid configuration.
+**Do not:** target a package with only its app display name.
 
-**DoD:** settings load/save tests pass; no generic settings framework is introduced.
+### S063 — List installed Flatpaks
+
+**Prerequisite:** S062.
+
+**Allowed files:** `src/backends/flatpak/catalog.rs`.
+
+**Implement:** list installed apps and runtimes across user/system/named installations;
+keep them distinct and use noninteractive read commands.
+
+**Validate:** fake-runner and manual host comparison.
+
+**DoD:** all installation scopes appear as separate records.
+
+**Do not:** merge apps and runtimes.
+
+### S064 — List Flatpak remotes
+
+**Prerequisite:** S061.
+
+**Allowed files:** `src/backends/flatpak/catalog.rs`, parser/tests.
+
+**Implement:** query remote name, URL where safe, collection ID, enabled state, and owning
+installation. Redact credentials from URLs in logs and UI.
+
+**Validate:** multiple remote and credential-bearing URL tests.
+
+**DoD:** remote identity is scoped to its installation.
+
+**Do not:** add or trust remotes.
+
+### S065 — Implement Flatpak search
+
+**Prerequisite:** S062–S064.
+
+**Allowed files:** `src/backends/flatpak/catalog.rs`, parser/tests.
+
+**Implement:** search apps/runtimes by query and remote; include source/installation details
+where output exposes them. Treat ambiguous results as separate candidates.
+
+**Validate:** duplicate ID across remotes/branches fixtures.
+
+**DoD:** search results preserve their full refs and remotes.
+
+**Do not:** choose the first ambiguous remote automatically.
+
+### S066 — Implement Flatpak details and updates
+
+**Prerequisite:** S063–S065.
+
+**Allowed files:** `src/backends/flatpak/catalog.rs`, parser/tests.
+
+**Implement:** details for an exact ref and list of available updates by installation.
+Capture update commit/version info where available.
+
+**Validate:** details, no updates, same ID different branch tests.
+
+**DoD:** updates can be listed without claiming cross-backend version ordering.
+
+**Do not:** run update operations yet.
+
+### S067 — Build Flatpak install/remove plans
+
+**Prerequisite:** S066, S012.
+
+**Allowed files:** `src/backends/flatpak/plan.rs`.
+
+**Implement:** exact remote/ref/scope plan commands or supported transaction preview. A plan
+must explicitly say if dependency effects are unavailable or partial.
+
+**Validate:** wrong scope/ref/remote and no-op plan tests.
+
+**DoD:** plan cannot switch system/user scope silently.
+
+**Do not:** include `--delete-data` by default.
+
+### S068 — Apply Flatpak install/remove
+
+**Prerequisite:** S067.
+
+**Allowed files:** `src/backends/flatpak/transaction.rs`.
+
+**Implement:** apply approved native operation with explicit `--user`, `--system`, or named
+installation, fixed args, noninteractive/assumeyes behavior only after user approval, and
+streamed output. Use Flatpak's native system helper/polkit authorization for system scope.
+
+**Validate:** VM install/remove on user and system scopes; authorization denied.
+
+**DoD:** a click produces one scoped transaction with result reconciliation.
+
+**Do not:** directly call Flatpak's private/privileged system helper D-Bus interface.
+
+### S069 — Add explicit Flatpak app-data removal choice
+
+**Prerequisite:** S068.
+
+**Allowed files:** `src/backends/flatpak/transaction.rs`, tests.
+
+**Implement:** model app-data deletion as a separate optional destructive intent; default
+must preserve `~/.var/app` data and permissions.
+
+**Validate:** command builder defaults to preserving data and only adds data deletion when
+explicitly requested.
+
+**DoD:** normal uninstall never silently deletes user data.
+
+**Do not:** add “clean everything” defaults.
+
+### S070 — Parse Flatpak progress/result output
+
+**Prerequisite:** S068.
+
+**Allowed files:** `src/backends/flatpak/progress.rs`.
+
+**Implement:** parse documented/stable progress output if possible; otherwise emit
+indeterminate progress plus current phase. Terminal result must be authoritative.
+
+**Validate:** fixtures for progress, warning, failure, and no progress lines.
+
+**DoD:** UI never displays fabricated percentage.
+
+**Do not:** infer percentage from elapsed time.
+
+### S071 — Add Flatpak provider contract tests
+
+**Prerequisite:** S063–S070.
+
+**Allowed files:** `tests/providers/flatpak.rs`, fixtures.
+
+**Implement:** test public provider methods with fake runner and at least one real Flatpak
+VM run for install/remove/update.
+
+**Validate:** `cargo test flatpak`.
+
+**DoD:** full contract passes without Flatpak installed for fixture tests; VM evidence recorded.
+
+**Do not:** begin APT before this gate passes.
 
 ---
 
-# 7. Packaging and release tasks
+## Stage G — Privileged helper foundation
 
-### S82 — Package the first Fedora release
+**Gate G6.** The typed privileged-helper boundary is implemented and tested before any
+APT, Pacman, Zypper, or rpm-ostree write operation is enabled. Provider-specific command
+builders are still implemented later, one backend at a time.
 
-Create an RPM spec for the GUI and helper. Install the helper under `/usr/libexec/paket/`
-with root-owned permissions supplied by the package manager. Do not manually set setuid bits.
-Include the desktop file, icon and AppStream metainfo when available. Verify the helper
-path/ownership/SELinux label after installation.
+### S072 — Define the typed helper protocol
 
-**DoD:** clean Fedora VM install/uninstall works; helper is not writable by an unprivileged
-user; DNF + Flatpak workflows pass after package installation.
+**Prerequisite:** S039.
 
-### S83 — Add CI quality checks
+**Allowed files:** `src/helper/mod.rs`, `src/helper/protocol.rs`, protocol tests.
 
-Add CI for format, tests, clippy and a static scan that rejects shell execution in
-application/backend code. Allow process spawning only in the approved runner and helper
-modules. Do not require package managers or root in unit-test CI.
+**Implement:**
 
-**DoD:** CI catches formatting, lint, test and forbidden process-spawn regressions.
+1. Define a versioned request envelope with a request ID and one typed operation.
+2. Define operation variants for APT refresh/install/remove/upgrade, Pacman full upgrade/install/remove,
+   Zypper install/remove/update, and rpm-ostree install/uninstall/upgrade-deployment.
+3. Requests contain backend-native package IDs and operation-specific safe options only.
+   They must not contain executable paths, arbitrary argv, environment variables, working
+   directories, shell strings, or caller-selected output paths.
+4. Define bounded JSONL response events: accepted, started, output/progress, completed,
+   failed, and cancelled. Use a protocol version and reject unknown versions.
+5. Keep helper protocol types independent from Tokio child-process types.
 
-### S84 — Document support and limitations
+**Validate:** JSON round-trip tests, unknown-version/operation tests, and a test proving
+that the request schema cannot represent an executable or arbitrary argument vector.
 
-Document tested distro versions, backend versions, capabilities, privilege behavior,
-preview limitations, cancellation behavior, license notices and known risks. Clearly
-label untested backends as experimental rather than supported.
+**DoD:** the helper wire protocol can express only declared package-management operations.
 
-**DoD:** release documentation matches actual contract/VM test evidence.
+**Do not:** implement command execution or any provider-specific command builder yet.
+
+### S073 — Validate helper requests independently
+
+**Prerequisite:** S072.
+
+**Allowed files:** `src/helper/validation.rs`, validation tests.
+
+**Implement:**
+
+1. Validate protocol version, request size, request ID, operation/backend compatibility,
+   non-empty targets, target count limits, and operation-specific option combinations.
+2. Reject control characters, path traversal, NUL bytes, unexpected option-like values,
+   unsupported scopes, and identifiers that fail each backend's documented grammar.
+3. Treat all client-side validation as advisory; repeat validation in the privileged helper.
+4. Bind the request to the authenticated local caller where the platform mechanism exposes
+   a trustworthy peer UID. Do not trust a UID field supplied in JSON.
+5. Return stable validation error codes without echoing sensitive request contents.
+
+**Validate:** adversarial IDs, malformed scope, oversized request, mismatched backend/action,
+empty target, and spoofed caller UID tests.
+
+**DoD:** malformed requests fail closed before any privileged command can be selected.
+
+**Do not:** spawn a process or trust UI validation.
+
+### S074 — Add the fixed helper command dispatcher
+
+**Prerequisite:** S073.
+
+**Allowed files:** `src/helper/commands/mod.rs`, `src/helper/commands/types.rs`, tests.
+
+**Implement:**
+
+1. Define an internal `HelperCommand` containing a fixed absolute executable and structured
+   `OsString` arguments. This type is created only inside the helper process.
+2. Add one explicit dispatcher matching typed protocol operations to backend-specific builder
+   functions. A backend operation without an implemented builder returns `Unsupported`.
+3. Do not create a general “run command” operation or a public constructor for arbitrary
+   executable/argv input.
+4. Provider-specific builders are added only in their own later tasks: APT refresh in S084,
+   APT install/remove/upgrade in S086 (executed by the transaction flow in S088), Pacman
+   system install/update in S097 and removal/AUR-artifact installation in S098/S105,
+   Zypper in S112, and rpm-ostree in S118.
+5. Add a test-only constructor behind `cfg(test)` so command dispatch can be validated
+   without root privileges.
+
+**Validate:** tests for unsupported builder behavior, fixed executable mapping, and proof
+that serialized requests cannot populate `HelperCommand` directly.
+
+**DoD:** all privileged process execution must pass through one typed dispatcher; no generic
+root command surface exists.
+
+**Do not:** implement APT/Pacman/Zypper/rpm-ostree command syntax in this task.
+
+### S075 — Implement bounded helper process execution and streaming
+
+**Prerequisite:** S074.
+
+**Allowed files:** `src/bin/helper.rs`, `src/helper/runner.rs`, helper tests.
+
+**Implement:**
+
+1. Read one bounded JSONL request from stdin and reject additional/unbounded payload data.
+2. Convert the validated request to one `HelperCommand` through the dispatcher.
+3. Spawn only the fixed command via `std::process::Command` with argv arrays; never use a
+   shell. Clear the environment and set only the minimal required locale/path variables.
+4. Drain stdout and stderr concurrently; emit bounded JSONL events; cap line length, total
+   output and retained diagnostic tail.
+5. Return a terminal event with exit code and typed classification. Keep the child alive
+   until waited/reaped; never treat disconnect as proof the process stopped.
+
+**Validate:** fake-command tests for large output, malformed request, non-zero exit, broken
+pipe, client disconnect, and child reaping.
+
+**DoD:** the helper executes only dispatched operations and cannot be flooded with unbounded
+input/output.
+
+**Do not:** add arbitrary command support or provider-specific transaction parsing.
+
+### S076 — Implement the unprivileged helper client
+
+**Prerequisite:** S075.
+
+**Allowed files:** `src/helper/client.rs`, client tests.
+
+**Implement:**
+
+1. Resolve the helper from one compile-time/package-configured absolute path; never search
+   `$PATH` and never accept a path from the UI/request.
+2. Invoke the fixed helper through `pkexec` with no package target in pkexec argv; send the
+   typed request through stdin.
+3. Parse bounded versioned JSONL events and classify authorization denied/cancelled,
+   helper unavailable, protocol mismatch, and native operation failure separately.
+4. Support Tokio cancellation without silently dropping the helper child; await/reap it and
+   return the final known state.
+5. Expose a small async client API to provider adapters.
+
+**Validate:** mocked helper success/failure/auth-cancel/protocol-mismatch tests and a test
+that no caller-supplied executable path is used.
+
+**DoD:** the application can request only protocol-defined privileged operations.
+
+**Do not:** install permissive polkit rules or grant passwordless access.
+
+### S077 — Define and verify the installed helper path contract
+
+**Prerequisite:** S076.
+
+**Allowed files:** `src/helper/client.rs`, `docs/security.md`, path tests.
+
+**Implement:**
+
+1. Define the package-configured absolute path contract for each supported packaging
+   family; if paths differ, inject the path at build/package time, not runtime PATH lookup.
+2. Before invocation, verify the path is absolute and inspect metadata without following
+   unexpected symlinks. The final owner/mode check is enforced by packaging and rechecked
+   in the release VM task.
+3. Ensure no user-writable directory is used for the production helper binary.
+4. Keep development/test helper paths explicitly separate from production configuration.
+
+**Validate:** tests for relative path rejection, missing path, unexpected symlink, and
+untrusted directory metadata.
+
+**DoD:** production helper resolution is deterministic and cannot fall back to a user-owned
+executable found on PATH.
+
+**Do not:** ship a setuid helper or add passwordless polkit policy.
+
+### S078 — Add helper boundary and adversarial protocol tests
+
+**Prerequisite:** S077.
+
+**Allowed files:** `tests/helper/`, `src/helper/` test-only code, `docs/security.md`.
+
+**Implement:**
+
+1. Exercise the complete unprivileged-client → protocol → validation → command-dispatch
+   path with fake command builders and no root access.
+2. Test unknown operations, wrong backend, argument injection attempts, oversized payloads,
+   malformed JSONL, output flooding, client disconnect, symlink/path substitution, and
+   authorization cancellation.
+3. Assert that no test path can reach a shell or arbitrary executable.
+4. Record the helper trust boundary and remaining provider-specific risks in the security doc.
+
+**Validate:** `cargo test helper` plus a source scan for shell invocation and unbounded reads.
+
+**DoD:** helper protocol and dispatch boundary are covered by adversarial tests before any
+provider uses the helper.
+
+**Do not:** claim the whole application security review is complete; final threat-model
+review remains in S165.
 
 ---
 
-# 8. Test strategy
+## Stage H — APT / dpkg provider
 
-Use the lightest test level that validates the change.
+**Gate G7.** APT can list, search, simulate, install, remove, and report progress without
+bypassing dpkg or lock protections.
 
-| Test level | When to use it | Examples |
-|---|---|---|
-| Pure unit test | Parsing, ID validation, model behavior | JSON parsers, os-release parser, helper request validation |
-| Fake-runner test | Command construction and adapter flow | Expected executable/argv and supplied stdout/stderr |
-| Contract test | Provider behavior shared across backends | Identity preservation, capabilities, error isolation |
-| VM smoke test | Real package-manager behavior | DNF install/remove, Flatpak polkit, APT/Pacman transaction |
-| UI manual test | Slint interaction and responsiveness | Search, plan review, cancellation/result rendering |
+### S079 — Probe APT/dpkg and version support
 
-Rules:
+**Prerequisite:** G3.
 
-1. Most tests must run without root and without any package manager installed.
-2. Real install/remove tests run only in disposable virtual machines with snapshots.
-3. Fixtures must be captured from real supported tool versions. Do not invent a convenient
-   output schema and then treat it as authoritative.
-4. When native output changes, add a new fixture and a parser case; do not edit old fixture
-   bytes merely to force the old parser to pass.
-5. Keep parser functions pure. Keep process execution outside parsers.
-6. Never run host-mutating tests as a default `cargo test` side effect.
+**Allowed files:** `src/backends/apt/probe.rs`.
 
-## 8.1 Minimum validation after every task
+**Implement:** detect `apt-get`, `apt-cache`, `dpkg-query`, architecture and supported APT
+version. Probe lock ownership conservatively; do not attempt to acquire a write lock.
 
-Run:
+**Validate:** Debian/Ubuntu and missing-tool fixtures.
+
+**DoD:** APT read/write capability depends on actual toolset and host qualification.
+
+**Do not:** use `apt` human-oriented output as a stable parser.
+
+### S080 — Parse dpkg-query installed records
+
+**Prerequisite:** S009, S079.
+
+**Allowed files:** `src/backends/apt/parse.rs`, fixtures.
+
+**Implement:** capture `dpkg-query` output with explicit `--showformat` fields for package,
+version, architecture, and status; handle multiarch and non-installed states.
+
+**Validate:** normal, multiarch, config-files-only, malformed record fixtures.
+
+**DoD:** only installed/desired package states are marked installed.
+
+**Do not:** split on whitespace where fields can contain spaces.
+
+### S081 — Implement APT installed listing
+
+**Prerequisite:** S080.
+
+**Allowed files:** `src/backends/apt/catalog.rs`.
+
+**Implement:** execute exact dpkg-query argv with bounds and map rows to package identity.
+
+**Validate:** fake-runner assertions and Debian VM comparison.
+
+**DoD:** installed list does not require root.
+
+**Do not:** call dpkg install/remove.
+
+### S082 — Implement APT search
+
+**Prerequisite:** S079.
+
+**Allowed files:** `src/backends/apt/catalog.rs`, parser/tests.
+
+**Implement:** use apt-cache search output with locale pinned and strict parsing; if a
+machine-readable alternative is used, document it and test minimum supported versions.
+
+**Validate:** query, no result, names with punctuation, malformed output.
+
+**DoD:** query remains a single argv element and result source is known.
+
+**Do not:** install from search result display text.
+
+### S083 — Implement APT package details
+
+**Prerequisite:** S081–S082.
+
+**Allowed files:** `src/backends/apt/catalog.rs`, parser/tests.
+
+**Implement:** retrieve installed and candidate metadata from apt-cache/dpkg-query. Keep
+candidate version, installed version, architecture and repository origin separate.
+
+**Validate:** installed/available/missing candidate tests.
+
+**DoD:** detail view can explain installed versus candidate versions.
+
+**Do not:** compare Debian version strings in shared core.
+
+### S084 — Refresh APT metadata
+
+**Prerequisite:** S083, S072–S078.
+
+**Allowed files:** `src/backends/apt/refresh.rs`, `src/helper/commands/apt.rs`, tests.
+
+**Implement:** add a fixed APT metadata-refresh command builder and execute refresh through
+the typed helper. Parse APT status-FD records where feasible and report repository errors.
+Do not refresh automatically on every search or app startup.
+
+**Validate:** VM refresh with working and failing repository fixture.
+
+**DoD:** metadata freshness and refresh failure are visible.
+
+**Do not:** continue as if metadata is fresh after a failed refresh.
+
+### S085 — Implement APT updates listing
+
+**Prerequisite:** S084.
+
+**Allowed files:** `src/backends/apt/catalog.rs`, parser/tests.
+
+**Implement:** query upgradable package candidates using a version-appropriate machine-safe
+or strict command output. Include held packages and phasing/eligibility states where the
+native source exposes them.
+
+**Validate:** upgradable, held, no update, and apt failure fixtures.
+
+**DoD:** “no updates” is distinct from “update query failed”.
+
+**Do not:** assume all candidates are installable.
+
+### S086 — Add APT transaction command builders
+
+**Prerequisite:** S072–S078, S083.
+
+**Allowed files:** `src/helper/commands/apt.rs`, `src/helper/commands/mod.rs`, tests.
+
+**Implement:** add fixed APT command builders for install/remove/upgrade. Accept only
+validated package IDs and explicit safe operation options; use a fixed `apt-get` executable
+and an exact argv allowlist. Do not accept raw argv, a command string, a user-selected
+executable, or unsafe flags such as unauthenticated package installation.
+
+**Validate:** exact argv snapshot tests, malformed ID rejection, empty target rejection,
+and a test for a package name beginning with `-`.
+
+**DoD:** approved APT operations map to fixed commands and cannot express arbitrary root
+execution.
+
+**Do not:** implement the APT helper process or bypass the native solver.
+
+### S087 — Simulate APT install/remove plans
+
+**Prerequisite:** S083.
+
+**Allowed files:** `src/backends/apt/plan.rs`, fixtures/tests.
+
+**Implement:** run `apt-get -s` simulations with reviewed options and parse dependency,
+removal, upgrade and conflict effects. Do not modify installed state during simulation.
+
+**Validate:** dependency install, package removal causing extra removals, no-op, malformed
+simulation fixtures.
+
+**DoD:** complete preview is declared only if the simulation parser covers the full output.
+
+**Do not:** use `--fix-broken` or bypass dependency checks.
+
+### S088 — Execute APT transactions with status-fd
+
+**Prerequisite:** S087, S072–S078, S086.
+
+**Allowed files:** `src/backends/apt/transaction.rs`.
+
+**Implement:** run approved `apt-get` operations through typed helper. Use `APT::Status-Fd`
+for machine progress events and bounded diagnostic stderr. Treat conffile decisions as an
+explicit policy, not an implicit overwrite.
+
+**Validate:** Debian VM install/remove, package scripts, conffile prompt fixture, auth denied.
+
+**DoD:** progress and final outcome are based on APT events/exit status.
+
+**Do not:** invoke `dpkg -i` as default install path.
+
+### S089 — Handle APT/dpkg locks and conffiles
+
+**Prerequisite:** S088.
+
+**Allowed files:** `src/backends/apt/transaction.rs`, tests.
+
+**Implement:** recognize lock-held responses, honor native lock wait support where
+available, and implement documented conffile behavior that preserves local configuration
+by default. Show when a conffile choice needs user input and do not hang on hidden prompts.
+
+**Validate:** lock contention and conffile fixture tests.
+
+**DoD:** lock contention is Busy/Waiting; local config is not silently discarded.
+
+**Do not:** remove lock files or pass force-confnew.
+
+### S090 — Add APT provider contract and VM tests
+
+**Prerequisite:** S081–S089.
+
+**Allowed files:** `tests/providers/apt.rs`, VM scripts.
+
+**Implement:** run provider contract tests on disposable Debian and Ubuntu images, including
+refresh, plan, install, remove, cancellation/reconcile, and lock failure.
+
+**Validate:** `cargo test apt`; VM test report.
+
+**DoD:** no write path is advertised unless its supported VM cases pass.
+
+**Do not:** start pacman implementation before this gate passes.
+
+---
+
+## Stage I — Pacman and AUR providers
+
+**Gate G8.** Arch operations cannot create partial upgrades; AUR execution requires explicit
+source review and never runs as root.
+
+### S091 — Probe Pacman and Arch host
+
+**Prerequisite:** G3.
+
+**Allowed files:** `src/backends/pacman/probe.rs`.
+
+**Implement:** detect pacman version, architecture, pacman.conf path, sync DB state hints,
+and optional pacman-contrib/checkupdates availability.
+
+**Validate:** Arch fixture and missing-helper fixture.
+
+**DoD:** host capability state is precise.
+
+**Do not:** enable writes on Arch derivatives without qualification.
+
+### S092 — Parse Pacman installed query
+
+**Prerequisite:** S009, S091.
+
+**Allowed files:** `src/backends/pacman/parse.rs`, fixtures.
+
+**Implement:** parse `pacman -Q` and `pacman -Qi` output with strict record boundaries;
+model package name/version/architecture/reason as available.
+
+**Validate:** installed, local package, malformed and empty fixtures.
+
+**DoD:** package identity is stable and pure parser tests pass.
+
+**Do not:** parse localized progress output here.
+
+### S093 — Implement Pacman installed listing
+
+**Prerequisite:** S092.
+
+**Allowed files:** `src/backends/pacman/catalog.rs`.
+
+**Implement:** list installed packages unprivileged with exact command arguments.
+
+**Validate:** fake-runner and Arch VM comparison.
+
+**DoD:** installed listing works without root.
+
+**Do not:** refresh sync databases.
+
+### S094 — Implement Pacman repository search/details
+
+**Prerequisite:** S093.
+
+**Allowed files:** `src/backends/pacman/catalog.rs`, parser/tests.
+
+**Implement:** search configured repositories and retrieve info with stable output handling.
+Preserve repository and architecture candidate identity.
+
+**Validate:** same-name candidates from multiple repos and no-result tests.
+
+**DoD:** package candidates remain separate by source/arch/version.
+
+**Do not:** treat AUR results as pacman repo results.
+
+### S095 — Implement safe Pacman update listing
+
+**Prerequisite:** S091.
+
+**Allowed files:** `src/backends/pacman/catalog.rs`, parser/tests.
+
+**Implement:** prefer `checkupdates` from pacman-contrib because it uses an isolated sync
+database; if unavailable, clearly report update-check limitation rather than running unsafe
+`pacman -Sy` alone. Keep package DB state explicit.
+
+**Validate:** installed, update available, helper missing, DB busy fixtures.
+
+**DoD:** update listing never creates a partial-upgrade state.
+
+**Do not:** run `pacman -Sy` as an update check.
+
+### S096 — Design Pacman install/update transaction plan
+
+**Prerequisite:** S094–S095, S012.
+
+**Allowed files:** `src/backends/pacman/plan.rs`.
+
+**Implement:** require full-upgrade semantics (`pacman -Syu` with targets) for repository
+install/update operations. Capture all available target/dependency effects using a
+qualified resolver path. If exact preview cannot be made complete, declare Estimated/Partial
+and show an explicit full-system-upgrade warning.
+
+**Validate:** fixture for target install plus unrelated system upgrades.
+
+**DoD:** user cannot accidentally request a partial system upgrade from Paket.
+
+**Do not:** use `pacman -Sy package` or hide unrelated upgrades.
+
+### S097 — Execute approved Pacman system transaction
+
+**Prerequisite:** S096, S072–S078.
+
+**Allowed files:** `src/backends/pacman/transaction.rs`, `src/helper/commands/pacman.rs`, tests.
+
+**Implement:** run a reviewed full-upgrade operation through typed helper. Ensure confirmation
+behavior cannot accept an unreviewed destructive solver change. Use command options only
+after validating supported pacman behavior on target Arch versions.
+
+**Validate:** Arch VM install, upgrade, conflict, signature failure and cancellation cases.
+
+**DoD:** full-upgrade constraint is enforced by command builder and tests.
+
+**Do not:** silently downgrade, skip dependencies, or bypass signature verification.
+
+### S098 — Implement Pacman remove planning/apply
+
+**Prerequisite:** S093, S097.
+
+**Allowed files:** `src/backends/pacman/plan.rs`, `src/backends/pacman/transaction.rs`, `src/helper/commands/pacman.rs`, tests.
+
+**Implement:** preview reverse dependencies and remove effects; support recursive removal
+only when explicitly reviewed. Keep removal of required packages blocked by native solver.
+
+**Validate:** no dependency, dependent packages, protected package, malformed target tests.
+
+**DoD:** remove plan lists dependency effects or declares preview incomplete.
+
+**Do not:** use `-Rdd` / dependency-check bypass.
+
+### S099 — Handle Pacman lock and external transactions
+
+**Prerequisite:** S097.
+
+**Allowed files:** `src/backends/pacman/transaction.rs`, tests.
+
+**Implement:** classify database lock contention, wait only through native/verified
+mechanisms, and re-probe after external pacman activity.
+
+**Validate:** lock-held and recovery fixture tests.
+
+**DoD:** Paket never removes `/var/lib/pacman/db.lck`.
+
+**Do not:** kill external pacman processes.
+
+### S100 — Implement AUR RPC search/details
+
+**Prerequisite:** S091.
+
+**Allowed files:** `src/backends/aur/client.rs`, parser/tests.
+
+**Implement:** use the documented AUR RPC v5 endpoints; add request timeout, bounded
+response size, rate-limit/backoff behavior, and schema-version handling. Treat API data as
+untrusted metadata.
+
+**Validate:** captured search/info fixtures, HTTP error, rate limit and invalid JSON tests.
+
+**DoD:** read-only AUR catalog works without executing any PKGBUILD.
+
+**Do not:** clone/build packages in this task.
+
+### S101 — Download and pin AUR source revision
+
+**Prerequisite:** S100.
+
+**Allowed files:** `src/backends/aur/source.rs`.
+
+**Implement:** clone/fetch the selected AUR git repo into Paket's build workspace, pin the
+reviewed commit hash, record branch/commit and reject unexpected path/symlink behavior.
+
+**Validate:** local test repository fixture with revision changes.
+
+**DoD:** build input is immutable for the reviewed build session.
+
+**Do not:** execute PKGBUILD content.
+
+### S102 — Present PKGBUILD diff for explicit review
+
+**Prerequisite:** S101.
+
+**Allowed files:** `src/backends/aur/review.rs`.
+
+**Implement:** show PKGBUILD and file changes from the last reviewed/current AUR revision;
+make source URLs, checksums and validpgpkeys visible. Require a separate explicit
+confirmation before build.
+
+**Validate:** diff fixture and missing-prior-revision test.
+
+**DoD:** no AUR build begins without review acknowledgement.
+
+**Do not:** treat signature presence as proof of safe code.
+
+### S103 — Build AUR package as the user
+
+**Prerequisite:** S102.
+
+**Allowed files:** `src/backends/aur/build.rs`.
+
+**Implement:** invoke `makepkg` under the logged-in user, never through the root helper;
+use an isolated per-build directory, bounded logs, timeout/cancel handling, and a stable
+build environment record. Require user approval for make dependencies.
+
+**Validate:** disposable Arch VM build of a harmless local fixture package.
+
+**DoD:** process UID is not root and logs/revision are recorded.
+
+**Do not:** invoke `sudo makepkg` or `makepkg` as root.
+
+### S104 — Inspect AUR build artifact
+
+**Prerequisite:** S103.
+
+**Allowed files:** `src/backends/aur/artifact.rs`.
+
+**Implement:** inspect output package metadata with read-only pacman tooling; verify
+expected package name/version/architecture and checksum. Reject unexpected/missing output.
+
+**Validate:** correct, mismatched, multiple output and corrupt artifact fixtures.
+
+**DoD:** only a verified build artifact is eligible for install.
+
+**Do not:** install yet.
+
+### S105 — Install reviewed AUR artifact
+
+**Prerequisite:** S104, S097.
+
+**Allowed files:** `src/backends/aur/transaction.rs`, helper protocol.
+
+**Implement:** stage the artifact safely for the helper (root-owned copy or securely opened
+file descriptor; never trust a mutable user path after authorization), then install via
+Pacman's native local-package operation while preserving full-upgrade policy and signature
+checks where applicable.
+
+**Validate:** Arch VM install, staged-file replacement race test, invalid package test.
+
+**DoD:** helper cannot be tricked into installing an arbitrary path or changed file.
+
+**Do not:** let the helper accept any filesystem path from the UI.
+
+### S106 — Add AUR build and install contract tests
+
+**Prerequisite:** S100–S105.
+
+**Allowed files:** `tests/providers/aur.rs`, fixtures/VM scripts.
+
+**Implement:** cover review required, diff, unprivileged build, failure, artifact verification,
+install, cancellation and log retention.
+
+**Validate:** `cargo test aur`; disposable Arch VM run.
+
+**DoD:** AUR remains disabled unless every safety gate is passed.
+
+**Do not:** add automatic AUR update-all.
+
+### S107 — Add Pacman/AUR combined Arch VM qualification
+
+**Prerequisite:** S093–S106.
+
+**Allowed files:** `tests/vm/arch/`, `docs/support-matrix.md`.
+
+**Implement:** qualify read, update listing, safe full-upgrade install, remove, AUR review,
+build and install on disposable Arch image.
+
+**Validate:** run VM suite and record exact Arch/pacman version.
+
+**DoD:** support matrix records pass/fail evidence and known limitations.
+
+**Do not:** advertise all Arch derivatives based on one Arch VM.
+
+---
+
+## Stage J — Zypper and rpm-ostree providers
+
+**Gate G9.** Separate mutable RPM and immutable deployment semantics are handled correctly.
+
+### S108 — Probe Zypper host
+
+**Prerequisite:** G3.
+
+**Allowed files:** `src/backends/zypper/probe.rs`.
+
+**Implement:** detect `zypper`, RPM/SUSE host markers, version and supported distro list.
+
+**Validate:** openSUSE and non-SUSE fixtures.
+
+**DoD:** Zypper capability does not imply DNF support.
+
+**Do not:** use raw RPM as a transaction backend.
+
+### S109 — Parse Zypper installed/search records
+
+**Prerequisite:** S108, S009.
+
+**Allowed files:** `src/backends/zypper/parse.rs`, fixtures.
+
+**Implement:** use a verified structured output mode if supported; otherwise fixture and
+strictly parse stable `LC_ALL=C` output. Preserve repo, vendor, arch, version and package
+status when exposed.
+
+**Validate:** installed/search/info and malformed fixtures.
+
+**DoD:** parser records exactly which Zypper version/output it supports.
+
+**Do not:** reuse DNF parser.
+
+### S110 — Implement Zypper catalog
+
+**Prerequisite:** S109.
+
+**Allowed files:** `src/backends/zypper/catalog.rs`.
+
+**Implement:** installed list, search, details, repository listing and update listing.
+Include patch/update distinction where native commands expose it.
+
+**Validate:** fake-runner tests and openSUSE VM read checks.
+
+**DoD:** installed/search/update states are distinct and source identity is preserved.
+
+**Do not:** enable mutations.
+
+### S111 — Implement Zypper dry-run planning
+
+**Prerequisite:** S110, S012.
+
+**Allowed files:** `src/backends/zypper/plan.rs`.
+
+**Implement:** use `--dry-run` for supported operations and capture dependency/vendor/repo
+changes. Mark preview complete only if all effects are parsed. Do not set license auto-agree
+or vendor-change options without a separate explicit user policy.
+
+**Validate:** package install/remove, dependency, vendor change and no-op fixtures.
+
+**DoD:** preview exposes resolver effects and required user decisions.
+
+**Do not:** auto-accept licenses/vendor switches.
+
+### S112 — Execute Zypper transactions
+
+**Prerequisite:** S111, S072–S078.
+
+**Allowed files:** `src/backends/zypper/transaction.rs`, `src/helper/commands/zypper.rs`, tests.
+
+**Implement:** typed helper install/remove/update with verified noninteractive behavior only
+after preview review; stream progress; capture exit state and repository failures.
+
+**Validate:** openSUSE VM transaction tests and lock contention.
+
+**DoD:** mutation uses Zypper, not raw rpm, and respects review choices.
+
+**Do not:** skip signature verification.
+
+### S113 — Add Zypper contract tests
+
+**Prerequisite:** S110–S112.
+
+**Allowed files:** `tests/providers/zypper.rs`, VM scripts.
+
+**Implement:** read, dry-run, install, remove, update, lock and vendor-change scenarios.
+
+**Validate:** `cargo test zypper`; openSUSE VM suite.
+
+**DoD:** support matrix includes exact qualified release/version.
+
+**Do not:** enable provider on untested SUSE versions.
+
+### S114 — Probe rpm-ostree / atomic deployments
+
+**Prerequisite:** S047.
+
+**Allowed files:** `src/backends/rpm_ostree/probe.rs`.
+
+**Implement:** detect rpm-ostree and booted/pending deployment state with documented
+read-only status command/API.
+
+**Validate:** mutable Fedora vs Silverblue/Kinoite-like VM fixtures.
+
+**DoD:** rpm-ostree is independent from DNF5 provider.
+
+**Do not:** run layering commands.
+
+### S115 — Parse rpm-ostree deployment status
+
+**Prerequisite:** S114.
+
+**Allowed files:** `src/backends/rpm_ostree/parse.rs`, fixtures.
+
+**Implement:** map booted deployment, pending deployment, layered packages, base image,
+version and reboot-required state.
+
+**Validate:** no pending, pending, rollback, malformed fixtures.
+
+**DoD:** UI can explain active vs pending system state.
+
+**Do not:** label pending as installed in the active system.
+
+### S116 — List layered packages and updates
+
+**Prerequisite:** S115.
+
+**Allowed files:** `src/backends/rpm_ostree/catalog.rs`.
+
+**Implement:** list layered/requested packages and available update/deployment state using
+supported rpm-ostree commands. Distinguish base image content from layered additions.
+
+**Validate:** Silverblue VM read comparisons.
+
+**DoD:** layered/base distinction is preserved.
+
+**Do not:** expose normal DNF package install actions.
+
+### S117 — Plan rpm-ostree package layering
+
+**Prerequisite:** S116, S012.
+
+**Allowed files:** `src/backends/rpm_ostree/plan.rs`.
+
+**Implement:** create typed plan for install/remove/upgrade with pending deployment and
+reboot-required effect. If operations are chainable, show the combined pending state.
+
+**Validate:** install/remove and pending deployment fixture tests.
+
+**DoD:** plan clearly states that changes may require reboot.
+
+**Do not:** claim live install semantics.
+
+### S118 — Apply rpm-ostree changes
+
+**Prerequisite:** S117, S072–S078.
+
+**Allowed files:** `src/backends/rpm_ostree/transaction.rs`, `src/helper/commands/rpm_ostree.rs`, tests.
+
+**Implement:** run approved `rpm-ostree` operations through the supported authorization
+path; reconcile pending deployment after completion.
+
+**Validate:** disposable atomic VM install/remove, failure and reboot-required result.
+
+**DoD:** active and pending deployments remain distinguishable.
+
+**Do not:** automatically reboot.
+
+### S119 — Qualify RPM provider matrix
+
+**Prerequisite:** S052–S060, S110–S118.
+
+**Allowed files:** `tests/vm/rpm/`, `docs/support-matrix.md`.
+
+**Implement:** qualify Fedora DNF5, openSUSE Zypper, and rpm-ostree separately. DNF4 is outside the first release; add it only through a separate provider task pack for named distro/version targets.
+
+**Validate:** VM suite and release support review.
+
+**DoD:** “RPM support” is broken down into actual provider/version support.
+
+**Do not:** claim generic RPM write support.
+
+---
+
+## Stage K — Snap and managed AppImage providers
+
+**Gate G10.** Snap works only when snapd is available; AppImage import/update/launch is safe
+and remains local to the user.
+
+### S120 — Probe snapd
+
+**Prerequisite:** G3.
+
+**Allowed files:** `src/backends/snap/probe.rs`.
+
+**Implement:** detect Snap CLI, snapd service/socket health, version and system support.
+
+**Validate:** installed, stopped, absent and unsupported fixtures.
+
+**DoD:** unavailable snapd disables only Snap capabilities.
+
+**Do not:** auto-install snapd.
+
+### S121 — Parse installed Snap records
+
+**Prerequisite:** S120, S009.
+
+**Allowed files:** `src/backends/snap/parse.rs`, fixtures.
+
+**Implement:** parse name, version, revision, tracking channel, publisher, confinement,
+notes and disabled state from verified output/API.
+
+**Validate:** normal, disabled, classic, malformed fixtures.
+
+**DoD:** installed revision and tracking channel are explicit.
+
+**Do not:** claim all snaps are strictly confined.
+
+### S122 — Implement Snap list/search/details
+
+**Prerequisite:** S121.
+
+**Allowed files:** `src/backends/snap/catalog.rs`.
+
+**Implement:** use supported snap CLI/search interface with timeouts and response limits.
+Keep publisher, channel and confinement visible.
+
+**Validate:** fake-runner tests and Snap-enabled VM read checks.
+
+**DoD:** Snap is searchable without snapd being a hard app dependency.
+
+**Do not:** assume store metadata is always online.
+
+### S123 — Implement Snap update/refresh listing
+
+**Prerequisite:** S122.
+
+**Allowed files:** `src/backends/snap/catalog.rs`, parser/tests.
+
+**Implement:** list available revisions/refreshable snaps. Distinguish pending Paket actions
+from snapd automatic refreshes and externally created changes.
+
+**Validate:** pending refresh, no update, snapd change in progress fixtures.
+
+**DoD:** update status comes from snapd state.
+
+**Do not:** claim Paket controls snapd auto-refresh schedule.
+
+### S124 — Plan and execute Snap operations
+
+**Prerequisite:** S123, S012.
+
+**Allowed files:** `src/backends/snap/transaction.rs`.
+
+**Implement:** typed install/remove/refresh using supported Snap CLI or documented snapd
+interface. Capture returned change ID and track its task state until terminal.
+
+**Validate:** Snap VM install/remove, authorization failure and daemon unavailable.
+
+**DoD:** completion is confirmed by snapd change/task state, not only process exit.
+
+**Do not:** assume a command returning a change ID means the operation completed.
+
+### S125 — Add Snap provider contract tests
+
+**Prerequisite:** S120–S124.
+
+**Allowed files:** `tests/providers/snap.rs`, VM scripts.
+
+**Implement:** read, search, update, install/remove, daemon busy, interrupted client and
+external refresh cases.
+
+**Validate:** `cargo test snap`; snapd VM suite.
+
+**DoD:** exact snapd version and behavior recorded.
+
+**Do not:** enable Snap on all distro images without test evidence.
+
+### S126 — Define Paket AppImage managed store
+
+**Prerequisite:** S013.
+
+**Allowed files:** `src/backends/appimage/store.rs`, `src/backends/appimage/mod.rs`.
+
+**Implement:** choose XDG data path for managed AppImages and a small record schema with
+stable ID, canonical path, checksum, import time, metadata source, and update capability.
+
+**Validate:** temp-directory tests for path derivation and duplicate records.
+
+**DoD:** Paket never manages arbitrary files outside its managed store without explicit
+user action.
+
+**Do not:** execute imported files.
+
+### S127 — Validate and import AppImage safely
+
+**Prerequisite:** S126.
+
+**Allowed files:** `src/backends/appimage/import.rs`, tests.
+
+**Implement:** validate regular file, size limit, ELF/AppImage marker/format, checksum and
+safe destination name; copy atomically into managed directory. Do not execute the file or
+invoke its embedded runtime for metadata discovery.
+
+**Validate:** valid, corrupt, non-AppImage, symlink, oversized and path traversal fixtures.
+
+**DoD:** import is a bounded filesystem operation with no code execution.
+
+**Do not:** run `--appimage-extract` or application startup during import.
+
+### S128 — Read safe AppImage metadata
+
+**Prerequisite:** S127.
+
+**Allowed files:** `src/backends/appimage/metadata.rs`.
+
+**Implement:** parse only metadata that can be read safely without executing the AppImage;
+allow manual name/icon/desktop metadata if extraction is not safely supported. Mark unknown
+fields instead of guessing.
+
+**Validate:** metadata fixtures and malicious archive/file cases.
+
+**DoD:** parser cannot write outside staging directory or execute scripts.
+
+**Do not:** trust embedded URLs or desktop Exec commands without validation.
+
+### S129 — Launch and remove managed AppImages
+
+**Prerequisite:** S127–S128.
+
+**Allowed files:** `src/backends/appimage/launch.rs`, `store.rs`.
+
+**Implement:** launch only on explicit user action as the current user, using canonical
+managed path and validated desktop entry. Remove only the Paket-managed file and its own
+integration records; never delete unrelated files.
+
+**Validate:** launch argv, path replacement/symlink and remove isolation tests.
+
+**DoD:** no root privileges are used for managed AppImages.
+
+**Do not:** execute imported apps during discovery.
+
+### S130 — Detect AppImage update information
+
+**Prerequisite:** S128.
+
+**Allowed files:** `src/backends/appimage/update.rs`.
+
+**Implement:** support only verified embedded update-information types documented by the
+AppImage spec/tooling. If absent or unsupported, report updates as Unsupported/Unknown.
+
+**Validate:** update-info present/absent/unknown fixtures.
+
+**DoD:** Paket never invents a generic AppImage update source.
+
+**Do not:** query arbitrary URLs during import.
+
+### S131 — Apply AppImage updates safely
+
+**Prerequisite:** S130.
+
+**Allowed files:** `src/backends/appimage/update.rs`.
+
+**Implement:** invoke a supported external updater only after explicit consent, stage the
+replacement, verify checksum/signature where available, keep previous file until verified,
+then atomically replace and update the record.
+
+**Validate:** successful update, failed download, corrupted replacement, missing updater.
+
+**DoD:** a failed update leaves the prior managed AppImage usable.
+
+**Do not:** auto-download on launch or overwrite without backup.
+
+---
+
+## Stage L — Unified catalog, AppStream, persistence, and cache
+
+**Gate G11.** Search and app grouping work across providers without corrupting native
+identity or misreporting stale data.
+
+### S132 — Add AppStream metadata parser/adapter
+
+**Prerequisite:** S010, G4–G10.
+
+**Allowed files:** `src/catalog/appstream.rs`, `Cargo.toml` if a parser dependency is needed.
+
+**Implement:** integrate with system AppStream metadata or use a maintained parser crate.
+Map component ID, name, summary, description, categories and icon references. Preserve
+component origin and refresh timestamp.
+
+**Validate:** XML fixture tests for desktop app, addon, runtime, missing icon and malformed
+metadata.
+
+**DoD:** AppStream metadata is optional and cannot break provider catalog loading.
+
+**Do not:** infer package ID from AppStream component ID.
+
+### S133 — Map AppStream components to package candidates
+
+**Prerequisite:** S132, S010.
+
+**Allowed files:** `src/catalog/appstream.rs`, tests.
+
+**Implement:** link an app to candidate PackageIds only through native/AppStream mapping
+known for that repository/provider. Preserve multiple package candidates and ambiguous links.
+
+**Validate:** one app/multiple package candidate and unresolved component fixtures.
+
+**DoD:** display grouping never changes install target.
+
+**Do not:** join solely on display name.
+
+### S134 — Add trusted icon cache
+
+**Prerequisite:** S132.
+
+**Allowed files:** `src/store/icon_cache.rs`, tests.
+
+**Implement:** cache icons under XDG cache with size/type limits and content hash; accept only
+local system metadata paths or HTTPS URLs from trusted repository metadata. Do not execute
+SVG scripts or load remote content automatically.
+
+**Validate:** image type/size, path traversal and stale cache tests.
+
+**DoD:** UI icons are bounded and sourced from known metadata.
+
+**Do not:** fetch arbitrary URLs from package descriptions.
+
+### S135 — Implement bounded federated search
+
+**Prerequisite:** G4–G10, S132.
+
+**Allowed files:** `src/catalog/search.rs`.
+
+**Implement:** dispatch one query to available providers under read scheduler; emit
+incremental provider results and provider-specific errors. A failed provider does not erase
+successful results from others.
+
+**Validate:** mixed success/failure, timeout, cancellation and empty results tests.
+
+**DoD:** search is responsive and provider failures are visible.
+
+**Do not:** wait indefinitely for one offline repository.
+
+### S136 — Implement safe result grouping/ranking
+
+**Prerequisite:** S133, S135.
+
+**Allowed files:** `src/catalog/ranking.rs`, tests.
+
+**Implement:** rank exact name/ID matches first, then summary/description matches. Group
+only by stable AppId; otherwise keep separate package rows. Add user-visible source badges.
+
+**Validate:** same-name different app, same app multiple sources, ambiguous IDs.
+
+**DoD:** results never conflate unrelated software.
+
+**Do not:** apply undocumented “preferred package manager” heuristics.
+
+### S137 — Add repository/source display model
+
+**Prerequisite:** S057, S064, S110, provider source support.
+
+**Allowed files:** `src/core/package.rs`, `src/catalog/mod.rs`, tests.
+
+**Implement:** common read-only source display fields: backend, native ID, name, enabled,
+URL (redacted), priority where available, and trust/signature status if exposed.
+
+**Validate:** source records across DNF, Flatpak and Zypper.
+
+**DoD:** source provenance is visible but native source identity is retained.
+
+**Do not:** add arbitrary repository URLs.
+
+### S138 — Add SQLite store and migrations
+
+**Prerequisite:** S013, S027.
+
+**Allowed files:** `src/store/db.rs`, `src/store/migrations/`, `Cargo.toml`.
+
+**Implement:** choose SQLite library after checking Tokio integration and bundle size. Use
+schema migrations, WAL where appropriate, foreign keys, busy timeout, and XDG state path.
+
+**Validate:** create/open/migrate/backup tests on temp database.
+
+**DoD:** database schema is versioned and corruption errors are surfaced.
+
+**Do not:** store package manager's canonical installed database.
+
+### S139 — Persist Paket settings and managed-file records
+
+**Prerequisite:** S138, S126.
+
+**Allowed files:** `src/store/settings.rs`, `src/store/migrations/`.
+
+**Implement:** persist user preferences, managed AppImage metadata, source visibility and
+safe UI preferences. Use typed defaults and tolerate missing/new fields.
+
+**Validate:** migration and unknown-setting tests.
+
+**DoD:** settings survive restart and are not stored in root-owned locations.
+
+**Do not:** store authentication credentials.
+
+### S140 — Add cache with TTL and invalidation
+
+**Prerequisite:** S138, G4–G10.
+
+**Allowed files:** `src/store/package_cache.rs`.
+
+**Implement:** cache read-only catalog/search results with backend/source key, schema
+version, timestamp and TTL. Invalidate after successful/unknown transaction, refresh, and
+external state change. Mark stale data in API responses.
+
+**Validate:** TTL expiry, source invalidation, backend-specific invalidation tests.
+
+**DoD:** cache never overrides native installed state after transaction.
+
+**Do not:** cache a successful empty response as a permanent empty catalog.
+
+### S141 — Persist transaction history
+
+**Prerequisite:** S138, S037–S039.
+
+**Allowed files:** `src/store/history.rs`, `src/store/migrations/`.
+
+**Implement:** store Paket batch ID, backend step, selected intent, timestamps, outcome,
+error classification and redacted diagnostics. Native provider history remains separately
+queryable where supported.
+
+**Validate:** partial success, interrupted task, migration and redaction tests.
+
+**DoD:** history does not claim rollback or native transaction completeness it cannot prove.
+
+**Do not:** store full unbounded stdout/stderr in SQLite.
+
+### S142 — Add provider refresh policies
+
+**Prerequisite:** S140.
+
+**Allowed files:** `src/app/coordinator.rs`, `src/catalog/search.rs`.
+
+**Implement:** refresh on user request, stale cache when needed, and after transaction.
+Add conservative periodic checks only when enabled by user settings; do not run write
+operations or download updates automatically.
+
+**Validate:** fake clock tests for refresh thresholds.
+
+**DoD:** startup is fast and network behavior is predictable.
+
+**Do not:** silently refresh all repositories at every app start.
+
+### S143 — Add backend history adapters
+
+**Prerequisite:** S141.
+
+**Allowed files:** provider-specific history modules.
+
+**Implement:** expose native DNF5/Snap/other transaction history where supported, with
+provider source ID and native timestamp. Keep Paket history and native history as separate
+records.
+
+**Validate:** parser fixtures and provider availability tests.
+
+**DoD:** history source is always clear.
+
+**Do not:** synthesize an undo operation from history.
+
+### S144 — Add catalog consistency checks
+
+**Prerequisite:** S135–S143.
+
+**Allowed files:** `src/catalog/consistency.rs`, tests.
+
+**Implement:** validate that every displayed package candidate has a registered provider,
+valid backend ID, scope, and source provenance. Flag stale or unresolved metadata.
+
+**Validate:** orphan metadata and provider-disabled fixture tests.
+
+**DoD:** invalid metadata is omitted or marked, never converted into a mutation target.
+
+**Do not:** repair native package databases.
+
+---
+
+## Stage M — Slint + Slint Kit production UI
+
+**Gate G12.** UI is added only after backend and catalog services have stable contracts.
+
+### S145 — Add Slint build integration
+
+**Prerequisite:** G11 and S002 license decision.
+
+**Allowed files:** `Cargo.toml`, `build.rs`, `ui/app.slint`.
+
+**Implement:** pin Slint 1.19.0 and Slint Kit 0.9.0; use the current documented `slint_kit_build`
+integration. If license gate is not compatible, stop and replace the Kit dependency with
+Slint's standard widgets rather than bypassing the license.
+
+**Validate:** clean Linux build.
+
+**DoD:** build uses pinned versions and license decision is recorded.
+
+**Do not:** build all screens in one task.
+
+### S146 — Create main application window and navigation shell
+
+**Prerequisite:** S145.
+
+**Allowed files:** `ui/app.slint`, `src/main.rs`.
+
+**Implement:** window shell, navigation for Discover, Installed, Updates, Queue, History,
+and Settings. Wire only static placeholder state.
+
+**Validate:** launch/close on supported Linux desktop session.
+
+**DoD:** UI event loop runs on main thread and shows stable window.
+
+**Do not:** run backend calls in callbacks.
+
+### S147 — Connect Slint to application commands/events
+
+**Prerequisite:** S146, S024.
+
+**Allowed files:** `src/ui/bridge.rs`, `src/app/events.rs`, `src/main.rs`.
+
+**Implement:** UI callbacks send typed `AppCommand` through bounded channels; coordinator
+sends typed UI events; apply model changes only through `slint::invoke_from_event_loop`.
+
+**Validate:** test command delivery, UI-thread update, dropped window handle and full channel.
+
+**DoD:** Slint does not depend on Tokio internals or provider implementations.
+
+**Do not:** call `block_on` from Slint callbacks.
+
+### S148 — Implement virtualized package list model
+
+**Prerequisite:** S147.
+
+**Allowed files:** `src/ui/state.rs`, `ui/components/package-list.slint`.
+
+**Implement:** use Slint models suitable for large lists; keep PackageId identity in each
+row and preserve selection when sorting/filtering. Add generation tokens so stale async
+results cannot update a newer query.
+
+**Validate:** sorting/filtering/selection identity test with large fixture list.
+
+**DoD:** old query results cannot overwrite newer search results.
+
+**Do not:** use row index as package identity.
+
+### S149 — Implement Discover search screen
+
+**Prerequisite:** S148, S135.
+
+**Allowed files:** `ui/views/discover.slint`, UI state/bridge.
+
+**Implement:** search field, loading/empty/partial-error states, source filters and candidate
+rows with provider/source/scope badges.
+
+**Validate:** fake search event stream for success, partial backend failure and no results.
+
+**DoD:** results explain where each candidate comes from.
+
+**Do not:** deduplicate by package name.
+
+### S150 — Implement package/application details panel
+
+**Prerequisite:** S149.
+
+**Allowed files:** `ui/views/package-details.slint`, UI state.
+
+**Implement:** details, version/source/scope, license, size, metadata provenance, runtime
+or dependency notes, and install/update/remove action to draft queue.
+
+**Validate:** partial metadata and AppStream missing icon tests.
+
+**DoD:** detail actions enqueue intent only.
+
+**Do not:** execute a native operation directly from detail callback.
+
+### S151 — Implement Installed screen
+
+**Prerequisite:** S148.
+
+**Allowed files:** `ui/views/installed.slint`.
+
+**Implement:** installed package/application list, backend filters, scope, search, refresh
+state, and remove-to-draft action.
+
+**Validate:** empty, large list, unsupported provider and stale cache cases.
+
+**DoD:** installed state is supplied by provider refresh, not local UI assumptions.
+
+**Do not:** remove on single click.
+
+### S152 — Implement Updates screen
+
+**Prerequisite:** S148, backend update providers.
+
+**Allowed files:** `ui/views/updates.slint`.
+
+**Implement:** per-backend update groups; display update eligibility, held/blocked status,
+full-upgrade requirements, Snap daemon-managed state, and rpm-ostree reboot-required state.
+
+**Validate:** mixed backend fixture with different update semantics.
+
+**DoD:** UI does not flatten incompatible update behavior into one generic button.
+
+**Do not:** apply all updates automatically.
+
+### S153 — Implement pending-change basket
+
+**Prerequisite:** S150–S152, S028–S032.
+
+**Allowed files:** `ui/views/queue.slint`, UI state.
+
+**Implement:** show selected intents grouped by backend/scope; support undoing an intent and
+show conflicting intents. While one batch runs, new clicks belong to next draft.
+
+**Validate:** duplicate click, conflict and active-batch tests.
+
+**DoD:** multiple install/remove clicks are safely represented before execution.
+
+**Do not:** spawn one child process per click.
+
+### S154 — Implement transaction review screen
+
+**Prerequisite:** S153, provider plan services.
+
+**Allowed files:** `ui/views/review.slint`.
+
+**Implement:** show user-selected targets separately from solver-added dependencies,
+upgrades, downgrades and removals. Show preview quality and warnings per backend. Require
+explicit approval before queueing a batch.
+
+**Validate:** native complete/partial/estimated/unavailable preview fixtures.
+
+**DoD:** missing preview detail is visible before apply.
+
+**Do not:** hide dependency removals below the fold.
+
+### S155 — Implement transaction progress view
+
+**Prerequisite:** S154, S024.
+
+**Allowed files:** `ui/views/progress.slint`, `src/ui/state.rs`.
+
+**Implement:** queue position, current backend step, phase, package action, determinate or
+indeterminate progress, cancel request, lock waiting and terminal status.
+
+**Validate:** fake event sequence for waiting/running/cancel/partial failure.
+
+**DoD:** progress is based on native events or is clearly indeterminate.
+
+**Do not:** synthesize a percentage from elapsed time.
+
+### S156 — Implement batch result and partial failure view
+
+**Prerequisite:** S155, S038.
+
+**Allowed files:** `ui/views/result.slint`.
+
+**Implement:** show successful steps, failed step, skipped steps, next action, and refresh
+requirement. Never label partial success as success for the whole batch.
+
+**Validate:** three-backend success/failure/skipped sample.
+
+**DoD:** user can see exactly what changed and what did not.
+
+**Do not:** offer “undo all” unless a backend has a separately verified native recovery.
+
+### S157 — Implement History screen
+
+**Prerequisite:** S141, S143.
+
+**Allowed files:** `ui/views/history.slint`.
+
+**Implement:** filter Paket batches and native backend history; label each source; show
+partial/interrupted states and redacted diagnostic details.
+
+**Validate:** persisted history fixtures.
+
+**DoD:** history is accurate after restart.
+
+**Do not:** imply every action is reversible.
+
+### S158 — Implement source/repository read-only screen
+
+**Prerequisite:** S137.
+
+**Allowed files:** `ui/views/sources.slint`.
+
+**Implement:** show installed/configured sources, backend, enabled state, remote/repo name,
+and sanitized URL. Keep editing disabled unless a later task defines trust/key UX.
+
+**Validate:** missing source metadata and credential redaction tests.
+
+**DoD:** source provenance is understandable and safe.
+
+**Do not:** add arbitrary remote URL input.
+
+### S159 — Implement Settings and diagnostics
+
+**Prerequisite:** S139, S025.
+
+**Allowed files:** `ui/views/settings.slint`, `ui/views/diagnostics.slint`.
+
+**Implement:** log level, cache refresh policy, source visibility, theme/accessibility
+preferences, support matrix, provider diagnostics and copy-redacted-report action.
+
+**Validate:** settings persistence and redaction tests.
+
+**DoD:** user can diagnose unavailable backend without opening a terminal.
+
+**Do not:** upload logs automatically.
+
+### S160 — Implement accessibility, keyboard, and localization baseline
+
+**Prerequisite:** S146–S159.
+
+**Allowed files:** `ui/`, `docs/accessibility.md`, localization resources.
+
+**Implement:** keyboard-only navigation, focus order, visible focus, semantic labels,
+contrast checks, text scaling, screen-reader names where Slint/platform supports them, and
+string externalization. Document limitations honestly.
+
+**Validate:** manual keyboard walkthrough and a supported screen-reader/desktop session.
+
+**DoD:** core search/install/review/progress workflows are usable without a mouse.
+
+**Do not:** declare accessibility complete from code review alone.
+
+---
+
+## Stage N — Security, integration qualification, packaging, and release
+
+**Gate G13.** A production release passes security review, VM matrix, packaging,
+upgrade/uninstall, and operational documentation.
+
+### S161 — Add parser fuzz tests
+
+**Prerequisite:** provider parsers S051–S144.
+
+**Allowed files:** `fuzz/`, parser tests.
+
+**Implement:** fuzz pure parsers for JSON, delimited output, os-release, Flatpak refs,
+APT records, Pacman, AUR responses, AppStream XML and helper protocol.
+
+**Validate:** bounded fuzz smoke run in CI/nightly.
+
+**DoD:** parsers do not panic or allocate unbounded memory for malformed input.
+
+**Do not:** fuzz real package-manager writes.
+
+### S162 — Add async scheduler and cancellation stress tests
+
+**Prerequisite:** S021–S039.
+
+**Allowed files:** `tests/runtime/`.
+
+**Implement:** test duplicate clicks, queue fairness, backpressure, cancellation races,
+shutdown during active write, external lock and app restart reconciliation.
+
+**Validate:** deterministic Tokio tests plus repeated stress run.
+
+**DoD:** no duplicate active writer, dropped terminal result, or orphaned owned task in tests.
+
+**Do not:** use sleeps as the only synchronization mechanism.
+
+### S163 — Add backend VM integration matrix
+
+**Prerequisite:** G4–G10.
+
+**Allowed files:** `tests/vm/`, CI workflow files.
+
+**Implement:** disposable VM images for Fedora DNF5, Debian/Ubuntu APT, Arch Pacman/AUR,
+openSUSE Zypper, rpm-ostree, Flatpak, and Snap where practical. Run real test packages and
+snapshot/revert VM after each write test.
+
+**Validate:** provider read/plan/write/failure suite on each qualified image.
+
+**DoD:** no production mutation test runs on the developer workstation.
+
+**Do not:** treat containers alone as proof of systemd/polkit correctness.
+
+### S164 — Add failure-injection and recovery tests
+
+**Prerequisite:** S163.
+
+**Allowed files:** `tests/vm/failure/`, `tests/providers/`.
+
+**Implement:** simulate network loss, mirror failure, repository signature failure, package
+scriptlet failure, lock contention, disk-space failure, user auth denial, process kill and
+Paket crash. Verify provider reconciliation and truthful UI result.
+
+**Validate:** VM report with each injected failure.
+
+**DoD:** failed/unknown operations do not become success or auto-retry.
+
+**Do not:** disable package signature checks to simplify tests.
+
+### S165 — Complete production security and threat-model review
+
+**Prerequisite:** S078, S088, S097–S099, S105, S112, S118, S124, S127, S129, S131,
+and QA tasks S161–S164.
+
+**Allowed files:** `docs/security.md`, security tests, narrowly scoped fixes in reviewed
+security-sensitive modules.
+
+**Implement:** review command injection, helper authorization, path races, symlinks,
+environment leakage, credential redaction, untrusted package metadata, AUR build scripts,
+AppImage import/launch, stale plans, transaction cancellation, crash recovery, and cache
+poisoning. Verify every privileged operation has an explicit allowlist and native identity
+validation. Record mitigations, evidence, and accepted residual risks.
+
+**Validate:** complete threat-model checklist, adversarial test suite, and second-person
+review of the helper boundary.
+
+**DoD:** every privileged or untrusted-input boundary is documented and has corresponding
+tests; unresolved critical/high findings block release.
+
+**Do not:** mark a risk accepted without a named rationale and release-note entry.
+
+### S166 — Package Paket for supported distributions
+
+**Prerequisite:** S145, S072–S078, S163, S165.
+
+**Allowed files:** native packaging files under `packaging/`, desktop/metainfo resources.
+
+**Implement:** create native RPM/DEB/Arch packages for qualified targets; include binary,
+helper path, desktop entry, icons, metainfo, docs, and correct runtime dependencies. Treat
+Flatpak packaging of Paket itself as a separate future effort because sandbox access to host
+package tools/system services requires a deliberate host integration design.
+
+**Validate:** install/upgrade/downgrade/uninstall on clean VMs and verify helper owner/mode.
+
+**DoD:** package lifecycle leaves no broken helper or stale desktop integration.
+
+**Do not:** rely only on `cargo run` for production validation.
+
+### S167 — Release engineering and support documentation
+
+**Prerequisite:** S161–S166.
+
+**Allowed files:** `.github/workflows/`, `docs/`, `CHANGELOG.md`, release scripts.
+
+**Implement:** CI for fmt/test/clippy/fuzz smoke/dependency audit; release artifacts per
+qualified distro; generate checksums and sign artifacts; publish SBOM; document supported
+versions, limitations, data handling, logs, helper authorization, update policy, AUR/AppImage
+risks, and known issues. Tag only after all release gates pass.
+
+**Validate:** reproduce release build from clean runner and verify signatures/checksums.
+
+**DoD:** release is traceable, signed, documented, and matches support matrix.
+
+**Do not:** claim unsupported distros or providers as production-ready.
+
+---
+
+## 6. Cross-cutting test strategy
+
+### 6.1 Unit tests
+
+Every pure parser and domain function has tests for normal, empty, malformed, missing-field,
+ambiguous, duplicate, stale, and unsupported input where relevant. Command builders have
+exact argv tests. IDs have wrong-backend and wrong-scope tests.
+
+### 6.2 Provider contract tests
+
+Each backend must pass the same high-level contract where it advertises the capability:
+
+- probe and descriptor;
+- installed listing;
+- search/details;
+- updates;
+- plan preview quality;
+- approved apply;
+- lock contention;
+- authorization denied;
+- cancellation request and final reconciliation;
+- external tool changing state;
+- partial failure and history.
+
+A provider may explicitly not support an operation. Unsupported is a passing contract result
+when the capability descriptor and UI explanation are correct.
+
+### 6.3 VM tests
+
+Use disposable VMs, not the developer's main OS. Snapshot before mutations and revert after.
+Containers are useful for parser/catalog tests but do not replace VM testing for polkit,
+systemd, package database locks, daemon activation, GUI auth agents, or reboot-required
+rpm-ostree deployments.
+
+### 6.4 Concurrency tests
+
+Test one active mutation globally, bounded read concurrency, cancellation races, channel
+backpressure, event coalescing, duplicate intent suppression, and app shutdown while a child
+is active. Ensure the native child is awaited/reaped.
+
+### 6.5 Security tests
+
+Test no shell invocation, fixed executable allowlists, package ID validation in both user
+process and helper, root-owned helper path, request size caps, path traversal, symlink races,
+credential redaction, signature failure, untrusted AppImage import, and AUR review gate.
+
+### 6.6 Required commands at every gate
 
 ```bash
 cargo fmt --check
 cargo test
-```
-
-For tasks that touch process execution, backend adapters, helper or core orchestration, also
-run:
-
-```bash
 cargo clippy --all-targets -- -D warnings
 ```
 
-The task may specify a narrower test command as well. The narrow test is additional, not a
-replacement for the minimum checks unless the repository is not yet in a state where the
-full command can pass; such a limitation must be recorded.
+At release gate also run the dependency audit, clean build, supported VM suite, and package
+install/upgrade/uninstall checks. Fuzz smoke tests should run in CI; longer fuzzing may run
+nightly.
 
 ---
 
-# 9. Risk register and mandatory safeguards
+## 7. Operational and UX safeguards
 
-| Risk | Safeguard |
+1. **No hidden writes:** search, startup, detail open, and refresh must not install/remove.
+2. **No silent trust changes:** never auto-import repository keys or disable signature checks.
+3. **No hidden data deletion:** Flatpak app data, AppImage files, build workspaces, and
+   package caches have distinct explicit cleanup actions.
+4. **No fake progress:** use native percentage when reliable; otherwise show phase and
+   indeterminate progress.
+5. **No false success:** a non-zero exit, daemon failure, missing final status, or interrupted
+   transaction must trigger reconciliation.
+6. **No blind retry:** retry is a user-visible decision after current state is re-read.
+7. **Stale plan protection:** if native repository or installed state changed after review,
+   present updated preview and request approval again.
+8. **External manager contention:** explain that another package manager owns the database;
+   never remove its lock or terminate its process.
+9. **App shutdown:** do not silently orphan a package transaction. Wait, minimize, or explain
+   that the transaction must finish before exit.
+10. **Updates are opt-in:** Paket reports updates and asks before applying them.
+
+---
+
+## 8. Important design risks and decisions to preserve
+
+| Risk | Required response |
 |---|---|
-| Agent expands a task into a large refactor | One `Sxx` per run; strict allowed-files list; stop on blocker. |
-| Package name used as mutation identity | `PkgId` is required; decode/validate in backend and helper. |
-| Shell/argument injection | Fixed executable + argv arrays; no shell; helper never accepts arbitrary argv. |
-| DNF/APT/Pacman package database lock | Serialize operations; map lock errors to a readable `Busy` state. |
-| Partial cross-backend transaction | Execute sequentially; report each completed/failed step; no fake rollback. |
-| Dependency solver differences hidden by common model | Native plan details and preview quality are explicit. |
-| Fedora Atomic treated as normal DNF | Disable DNF5 backend; add a separate rpm-ostree backend only with a dedicated plan. |
-| AUR build script executes as root | AUR helpers run as the user; never use Paket root helper. |
-| Flatpak/Snap double privilege prompt | Use their native polkit authorization flow. |
-| Untrusted AppImage executed during scan | Never execute files for metadata; explicit user launch only. |
-| Repository key silently trusted | Never auto-import keys or disable signature verification. |
-| Slint Kit breaking changes/license | Pin researched versions; isolate Kit imports; document license obligations. |
+| Same app exists in RPM, Flatpak, Snap and AppImage | Keep separate package candidates and let the user choose source |
+| Same Flatpak ID exists in multiple remotes/branches/installs | Preserve full ref and installation identity |
+| Package manager lock held externally | Show Busy/Waiting; never delete lock file |
+| Cross-backend batch partly succeeds | Record each backend step; stop and re-plan after failure |
+| Native resolver output incomplete | Mark preview partial/estimated or disable write capability |
+| AUR PKGBUILD executes arbitrary build logic | Require source review; build as normal user; no root build |
+| AppImage is untrusted executable content | Import/inspect without executing; run only after user action |
+| DNF5 daemon not installed | Keep read capabilities separate; explain missing service or use a separately qualified fallback |
+| Immutable/atomic distro | Use rpm-ostree adapter, not normal DNF transaction assumptions |
+| Tokio + Slint event loop mismatch | Dedicated Tokio runtime and `invoke_from_event_loop`; no blocking/`block_on` in callbacks |
+| Tokio child dropped during operation | Explicit cancellation, retain handle, await/reap, reconcile state |
+| Slint Kit still pre-1.0 | Pin version; isolate components; license and upgrade review |
+| AppStream metadata disagrees with provider | Metadata is presentation-only; native package ID remains mutation authority |
+| External update happens after preview | Invalidate/re-plan and ask for approval again |
+| Package manager command output changes | Version-qualified fixtures and explicit unsupported version state |
 
 ---
 
-# 10. Suggested first execution sequence
+## 9. Suggested first execution sequence
 
-Do not ask the agent to do this whole list in one run. This is only the order for separate
-agent invocations and human reviews.
+Do not implement the entire list in one AI run. The first sequence is:
 
-| Order | Task | Expected result |
-|---:|---|---|
-| 1 | S01 | Repository baseline recorded |
-| 2 | S02 | Minimal Cargo package compiles |
-| 3 | S03–S06 | Basic domain types and errors |
-| 4 | S07–S10 | Safe process runner and fake runner |
-| 5 | S11–S12 | Host parser and backend registry skeleton |
-| 6 | S13–S21 | DNF read-only catalog |
-| 7 | S22–S34 | DNF plan + privileged install/remove |
-| 8 | S35–S41 | Flatpak provider |
-| 9 | S42–S45 | Stable two-provider core API |
-| 10 | S46–S54 | Initial Slint UI and acceptance test |
-| 11 | S55 onward | Add optional providers one task pack at a time |
+1. S001 — inspect repository;
+2. S002 — settle name/license decision;
+3. S003–S012 — establish only the toolchain and domain models;
+4. S013–S026 — add Tokio and the process/runtime boundary;
+5. S027–S039 — prove click batching and one-writer coordination with fake providers;
+6. S040–S048 — host detection and provider registry;
+7. implement and VM-qualify DNF5 before starting more backend packs;
+8. continue provider-by-provider; do not start the production UI before G11.
 
-**Recommended first coding task after this document is reviewed: S01 only.**
+**Critical recommendation:** implement the batch basket and mutation coordinator before any
+real install/remove operation. That makes “multiple clicks” a domain/scheduler feature that
+can be proven with fake backends, instead of a concurrency bug discovered after the UI is
+built.
 
 ---
 
-# Appendix A — What “done” means for a provider
+## Appendix A — Current research notes (2026-11-23)
 
-A provider is not considered implemented because it can list packages. Before it is
-advertised as supported, verify each applicable item:
+These are source-backed constraints used in the plan; exact commands must still be verified
+against the minimum versions Paket chooses to support.
 
-- [ ] Probe reports available/unavailable correctly, with a reason.
-- [ ] Package IDs preserve all identity discriminators needed by that backend.
-- [ ] Installed listing is correct for the supported host/tool version.
-- [ ] Search preserves distinct sources/candidates.
-- [ ] Details never use display name as mutation identity.
-- [ ] Updates are listed without cross-backend version comparison.
-- [ ] Plans distinguish selected targets from solver-resolved effects.
-- [ ] Plan preview quality is honest (`Native`, `Estimated`, `Unavailable`).
-- [ ] Install/remove use the native authorization model.
-- [ ] Helper validation is repeated for privileged system package managers.
-- [ ] Common errors are classified without hiding diagnostic context.
-- [ ] Missing tools/unsupported hosts do not crash other providers.
-- [ ] Unit, fake-runner, contract and required VM tests pass.
-- [ ] Tested distro and package-manager versions are documented.
+- Slint 1.19 was released on 2026-11-16. Slint's current Rust docs say the event loop must
+  run on the main thread, recommend moving work off that thread, and provide
+  `invoke_from_event_loop` to update UI state from workers.
+- Slint's `spawn_local` documentation explicitly warns that the Slint event loop does not
+  drive Tokio's runtime reliably; it documents compatibility constraints and an optional
+  `async_compat` bridge. Paket chooses a separate Tokio runtime instead.
+- Slint Kit 0.9.0 currently describes itself as actively developed with breaking changes
+  expected, requires Rust 1.95+ and Slint 1.19.0, and states the base kit is GPL-3.0-or-later.
+  Pin it and confirm license compatibility before use.
+- Tokio 1.54.1 was released 2026-10-21; current Tokio docs describe async process support,
+  semaphores, and explicit child-process ownership/reaping caveats.
+- DNF5 documents `repoquery --queryformat`, JSON output for selected list/repo commands,
+  and a D-Bus daemon API for sessions, goal resolution, transactions and progress. Fedora
+  packages `dnf5daemon-server` separately.
+- PackageKit exposes an asynchronous D-Bus transaction API and advertises capabilities per
+  backend. It can be evaluated as an optional transport, but must not be assumed universal.
+- APT provides status-FD progress records; use that rather than scraping a terminal bar.
+- Arch documentation explicitly says partial upgrades are unsupported; use full-system
+  upgrade semantics and do not use `pacman -Sy package`.
+- Arch's AUR guidance warns PKGBUILDs are user-produced and may contain malicious code; it
+  recommends reviewing PKGBUILDs and running makepkg as a normal user.
+- Flatpak supports multiple user/system/named installations and explicitly treats app-data
+  deletion separately from uninstall. Its system helper is a privileged internal interface
+  not intended for third-party clients; use supported Flatpak CLI behavior.
+- Snap refreshes are daemon-managed and may happen automatically; Paket must reconcile
+  snapd changes rather than claiming to own all refresh operations.
+- AppImage update information is embedded by the application author and may be absent;
+  there is no universal repository update source for all AppImages.
+- openSUSE documents Zypper as its own command-line package manager with dry-run and
+  non-interactive behavior; do not treat it as DNF.
+- rpm-ostree package layering creates a pending deployment and normally takes effect after
+  reboot; it must have its own state model/provider.
+- `pkexec` runs a specified program as root using a polkit authorization path and does not
+  validate arguments itself. The helper must validate its own typed requests and be installed
+  in a root-owned, non-user-writable location.
 
-# Appendix B — Capability matrix template
+## Appendix B — Source references
 
-Fill this table only with tested facts. “Planned” is not “supported”.
+Official/upstream documentation used for the current research snapshot:
 
-| Backend | Host tested | Installed | Search | Details | Updates | Plan | Install | Remove | Notes |
-|---|---|---:|---:|---:|---:|---:|---:|---:|---|
-| DNF5 | Fedora Workstation | — | — | — | — | — | — | — | |
-| Flatpak | Fedora Workstation | — | — | — | — | — | — | — | |
-| APT | Debian/Ubuntu | — | — | — | — | — | — | — | |
-| Pacman | Arch-compatible | — | — | — | — | — | — | — | |
-| AUR | Arch-compatible | — | — | — | — | — | — | — | Unprivileged build only |
-| Snap | Snap-enabled host | — | — | — | — | — | — | — | |
-| AppImage | Linux desktop | — | — | — | N/A | N/A | — | — | Local file manager |
+1. [Slint 1.19 release notes](https://www.slint.dev/blog/slint-1.19-released)
+2. [Slint Rust threading and event-loop docs](https://docs.slint.dev/latest/docs/rust/slint/)
+3. [Slint `invoke_from_event_loop`](https://docs.slint.dev/latest/docs/rust/slint/fn.invoke_from_event_loop)
+4. [Slint `spawn_local` and Tokio compatibility notes](https://docs.slint.dev/latest/docs/rust/slint/fn.spawn_local)
+5. [Slint Kit project setup](https://slint-kit.dev/guides/project-setup/), [changelog](https://slint-kit.dev/changelog/), [license statement](https://slint-kit.dev/), and [component reference](https://slint-kit.dev/components/)
+6. [Tokio release notes](https://github.com/tokio-rs/tokio/releases)
+7. [Tokio async process Command](https://docs.rs/tokio/latest/tokio/process/struct.Command.html)
+8. [Tokio Child lifecycle and reaping](https://docs.rs/tokio/latest/tokio/process/struct.Child.html)
+9. [Tokio Semaphore](https://docs.rs/tokio/latest/tokio/sync/struct.Semaphore.html)
+10. [DNF5 repoquery reference](https://dnf5.readthedocs.io/en/stable/commands/repoquery.8.html)
+11. [DNF5 daemon overview](https://dnf5.readthedocs.io/en/latest/dnf_daemon/)
+12. [DNF5 daemon D-Bus API](https://dnf5.readthedocs.io/en/stable/dnf_daemon/dnf5daemon_dbus_api.8.html)
+13. [Fedora dnf5daemon-server package](https://packages.fedoraproject.org/pkgs/dnf5/dnf5daemon-server/)
+14. [PackageKit introduction](https://www.freedesktop.org/software/PackageKit/doc/introduction.html)
+15. [PackageKit transaction D-Bus API](https://www.freedesktop.org/software/PackageKit/doc/dbus-org.freedesktop.packagekit1.Transaction.html)
+16. [Debian apt-get reference](https://manpages.debian.org/trixie/apt/apt-get.8.en.html)
+17. [APT progress reporting via Status-Fd](https://github.com/Debian/apt/blob/main/doc/progress-reporting.md)
+18. [Arch pacman manual](https://man.archlinux.org/man/core/pacman/pacman.8.en)
+19. [Arch partial-upgrade warning](https://wiki.archlinux.org/title/partial_upgrade)
+20. [Arch AUR guidance](https://wiki.archlinux.org/title/AUR)
+21. [Flatpak command reference](https://docs.flatpak.org/en/latest/flatpak-command-reference.html)
+22. [Flatpak system/user installation guidance](https://docs.flatpak.org/en/latest/using-flatpak.html)
+23. [Flatpak libflatpak/system helper API notes](https://docs.flatpak.org/en/latest/libflatpak-api-reference.html)
+24. [Snap update and change monitoring docs](https://snapcraft.io/docs/how-to-guides/manage-snaps/manage-updates/)
+25. [AppImage specification](https://docs.appimage.org/reference/specification.html)
+26. [AppImage update information](https://docs.appimage.org/packaging-guide/optional/updates.html)
+27. [openSUSE Zypper CLI documentation](https://doc.opensuse.org/documentation/leap/reference/html/book-reference/cha-sw-cl.html)
+28. [rpm-ostree administrator handbook](https://coreos.github.io/rpm-ostree/administrator-handbook/)
+29. [polkit `pkexec` manual](https://www.freedesktop.org/software/polkit/docs/latest/pkexec.1.html)
+30. [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir/)
 
-# Appendix C — Change-control rule
+---
 
-If implementation reality conflicts with this document:
+## Appendix C — Change-control rule
 
-1. Stop the current task if the conflict changes its scope or safety assumptions.
-2. Record the observed command output, tool version and host in `docs/deviations.md`.
-3. Propose the smallest correction to the relevant task or contract.
-4. Do not use the discovery as permission to implement future tasks.
-5. Resume only the current `Sxx` after the scope is clear.
+Change a locked decision only in a dedicated design task with:
 
-This keeps the plan usable for a smaller coding model: small prompts, small diffs,
-fast validation, explicit stopping points and no hidden multi-stage work.
+1. the old decision and reason it no longer fits;
+2. supporting upstream documentation or VM evidence;
+3. impact on existing interfaces, tests, packaging and supported hosts;
+4. migration steps;
+5. a bounded implementation sequence.
+
+Do not let an implementation agent silently change the architecture while completing an
+ordinary `Sxxx` task.
