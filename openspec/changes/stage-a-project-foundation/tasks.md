@@ -31,7 +31,7 @@ package and identity types partially cover S004 and S007 and must be finished th
   `BackendId`/`PkgId` are partial; scope and `SourceId` are missing.
 - [x] S008 Add typed installation scopes (system, user, named Flatpak installation, managed
   local store); verify user and system refs stay distinct through serde.
-- [ ] S009 Add catalog package, update and search-scope records; verify serialization tests
+- [x] S009 Add catalog package, update and search-scope records; verify serialization tests
   cover missing fields and same-name records remain distinct.
 - [ ] S010 Add independent application grouping with many-to-many package candidates; verify
   one app maps to RPM and Flatpak candidates without collapsing install identity.

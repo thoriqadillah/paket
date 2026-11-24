@@ -53,16 +53,15 @@ impl InstallationScope {
     }
 }
 
-/// A backend- and scope-qualified package identity. `native` is opaque to core.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct PackageId {
     pub backend: BackendId,
     pub scope: InstallationScope,
+    /// Opaque backend-native package identity, e.g. rpm repository, or `org.gnome.Platform/x86_64/42.0` for Flatpak.
     pub native: String,
 }
 
 impl PackageId {
-    /// Stable list-model key. Includes every identity discriminator.
     pub fn key(&self) -> String {
         format!(
             "{}:{}:{}",
@@ -73,10 +72,10 @@ impl PackageId {
     }
 }
 
-/// A backend-native repository, remote or channel identity. `native` is opaque to core.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct SourceId {
     pub backend: BackendId,
+    /// Opaque backend-native package identity, e.g. rpm repository, or `org.gnome.Platform/x86_64/42.0` for Flatpak.
     pub native: String,
 }
 
