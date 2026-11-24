@@ -26,7 +26,7 @@ package and identity types partially cover S004 and S007 and must be finished th
 
 - [x] S006 Add distinct catalog, plan and operation error families with safe user messages;
   verify unit tests match every variant without parsing stderr.
-- [ ] S007 Add `BackendId`, `PackageId { backend, scope, native }` and `SourceId` with stable
+- [x] S007 Add `BackendId`, `PackageId { backend, scope, native }` and `SourceId` with stable
   keys; verify equality/hash/serialization tests keep same-name packages distinct. Existing
   `BackendId`/`PkgId` are partial; scope and `SourceId` are missing.
 - [ ] S008 Add typed installation scopes (system, user, named Flatpak installation, managed
