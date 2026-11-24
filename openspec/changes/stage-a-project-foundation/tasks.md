@@ -8,10 +8,10 @@ package and identity types partially cover S004 and S007 and must be finished th
 - [x] S001 Record repository, toolchain and host baseline in `docs/baseline.md`; verify it
   names the layout, `cargo`/`rustc` versions, distro, installed package tools, baseline
   command results and blockers, with no source files changed.
-- [ ] S002 Record naming, distribution, project license and third-party license policy in
+- [x] S002 Record naming, distribution, project license and third-party license policy in
   `docs/decisions.md`; verify Slint Kit GPL-3.0-or-later compatibility is an explicit
   yes/no with evidence.
-- [ ] S003 Pin edition 2024, `rust-version = "1.95"` and the CI toolchain channel; verify
+- [x] S003 Pin edition 2024, `rust-version = "1.95"` and the CI toolchain channel; verify
   `rustc --version` and `cargo check` pass with the pinned toolchain.
 
 ## 2. Package scaffolding and policy
