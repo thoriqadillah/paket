@@ -16,7 +16,7 @@ package and identity types partially cover S004 and S007 and must be finished th
 
 ## 2. Package scaffolding and policy
 
-- [ ] S004 Create the `paket` library, GUI binary placeholder and `paket-helper` placeholder;
+- [x] S004 Create the `paket` library, GUI binary placeholder and `paket-helper` placeholder;
   verify `cargo check --all-targets` and `cargo test` pass with no UI dependency. Existing
   `src/lib.rs` and `src/bin/helper.rs` are partial; `src/main.rs` is missing.
 - [ ] S005 Adopt standard rustfmt and a warnings-denied clippy baseline; verify

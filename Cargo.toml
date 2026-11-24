@@ -5,6 +5,10 @@ edition = "2024"
 rust-version = "1.95"
 
 [[bin]]
+name = "paket"
+path = "src/main.rs"
+
+[[bin]]
 name = "paket-helper"
 path = "src/bin/helper.rs"
 
