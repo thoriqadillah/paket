@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 /// A package-manager backend supported by Paket.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -30,18 +31,24 @@ impl BackendId {
     }
 }
 
-/// The installation a package belongs to. More scopes arrive with S008.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum InstallationScope {
     System,
     User,
+    /// A Flatpak installation selected by name (`flatpak --installation=NAME`).
+    NamedInstallation(String),
+    /// Root of Paket's managed local store.
+    LocalManagedStore(PathBuf),
 }
 
 impl InstallationScope {
-    pub fn as_str(self) -> &'static str {
+    /// Stable key fragment included in package and list-model keys.
+    pub fn key(&self) -> String {
         match self {
-            Self::System => "system",
-            Self::User => "user",
+            Self::System => "system".to_string(),
+            Self::User => "user".to_string(),
+            Self::NamedInstallation(name) => format!("installation:{name}"),
+            Self::LocalManagedStore(path) => format!("store:{}", path.display()),
         }
     }
 }
@@ -60,7 +67,7 @@ impl PackageId {
         format!(
             "{}:{}:{}",
             self.backend.as_str(),
-            self.scope.as_str(),
+            self.scope.key(),
             self.native
         )
     }
@@ -148,6 +155,47 @@ mod tests {
             serde_json::from_str(&serde_json::to_string(&user).unwrap()).unwrap();
         assert_eq!(round_tripped, user);
         assert_ne!(round_tripped, system);
+    }
+
+    #[test]
+    fn same_ref_across_all_scopes_is_distinct() {
+        let scopes = [
+            InstallationScope::System,
+            InstallationScope::User,
+            InstallationScope::NamedInstallation("work".to_string()),
+            InstallationScope::NamedInstallation("home".to_string()),
+            InstallationScope::LocalManagedStore(PathBuf::from("/srv/paket/appimages")),
+        ];
+
+        let ids: HashSet<PackageId> = scopes
+            .iter()
+            .cloned()
+            .map(|scope| id(BackendId::Flatpak, scope, "org.foo.App"))
+            .collect();
+        let keys: HashSet<String> = ids.iter().map(PackageId::key).collect();
+
+        assert_eq!(ids.len(), scopes.len());
+        assert_eq!(keys.len(), scopes.len());
+
+        for pkg in &ids {
+            let decoded: PackageId =
+                serde_json::from_str(&serde_json::to_string(pkg).unwrap()).unwrap();
+            assert_eq!(&decoded, pkg);
+        }
+    }
+
+    #[test]
+    fn named_installation_and_local_store_round_trip() {
+        for scope in [
+            InstallationScope::NamedInstallation("work".to_string()),
+            InstallationScope::LocalManagedStore(PathBuf::from("/srv/paket/appimages")),
+        ] {
+            let decoded: InstallationScope =
+                serde_json::from_str(&serde_json::to_string(&scope).unwrap()).unwrap();
+
+            assert_eq!(decoded, scope);
+            assert_eq!(decoded.key(), scope.key());
+        }
     }
 
     #[test]

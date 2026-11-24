@@ -29,7 +29,7 @@ package and identity types partially cover S004 and S007 and must be finished th
 - [x] S007 Add `BackendId`, `PackageId { backend, scope, native }` and `SourceId` with stable
   keys; verify equality/hash/serialization tests keep same-name packages distinct. Existing
   `BackendId`/`PkgId` are partial; scope and `SourceId` are missing.
-- [ ] S008 Add typed installation scopes (system, user, named Flatpak installation, managed
+- [x] S008 Add typed installation scopes (system, user, named Flatpak installation, managed
   local store); verify user and system refs stay distinct through serde.
 - [ ] S009 Add catalog package, update and search-scope records; verify serialization tests
   cover missing fields and same-name records remain distinct.
