@@ -37,7 +37,7 @@ package and identity types partially cover S004 and S007 and must be finished th
   one app maps to RPM and Flatpak candidates without collapsing install identity.
 - [x] S011 Add the expanded capability set and backend descriptor; verify absent, read-only
   and fully available descriptors are distinguishable.
-- [ ] S012 Add transaction domain models for intents, resolved changes, plans, outcomes and
+- [x] S012 Add transaction domain models for intents, resolved changes, plans, outcomes and
   preview quality; verify native, partial, unavailable and multi-backend partial-failure
   cases.
 
