@@ -33,7 +33,7 @@ package and identity types partially cover S004 and S007 and must be finished th
   local store); verify user and system refs stay distinct through serde.
 - [x] S009 Add catalog package, update and search-scope records; verify serialization tests
   cover missing fields and same-name records remain distinct.
-- [ ] S010 Add independent application grouping with many-to-many package candidates; verify
+- [x] S010 Add independent application grouping with many-to-many package candidates; verify
   one app maps to RPM and Flatpak candidates without collapsing install identity.
 - [ ] S011 Add the expanded capability set and backend descriptor; verify absent, read-only
   and fully available descriptors are distinguishable.

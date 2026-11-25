@@ -87,6 +87,35 @@ impl SearchScope {
     }
 }
 
+/// AppStream component identity, e.g. `org.gnome.Calculator.desktop`.
+///
+/// This groups display rows only; it is never an install target.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct AppId(String);
+
+impl AppId {
+    pub fn new(native: impl Into<String>) -> Self {
+        Self(native.into())
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// A user-facing application grouped independently of its installable candidates.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct AppRecord {
+    /// Absent when no trusted AppStream component maps to this app.
+    pub id: Option<AppId>,
+    pub name: String,
+    pub summary: Option<String>,
+    pub description: Option<String>,
+    pub categories: Vec<String>,
+    /// Every candidate keeps its own `PackageId`; grouping never merges them.
+    pub package_candidates: Vec<PackageId>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -250,5 +279,57 @@ mod tests {
         assert_eq!(decoded, scope);
         assert_eq!(flatpak.id, flatpak_identity);
         assert_eq!(flatpak.id.key(), "flatpak:user:org.foo.App");
+    }
+
+    #[test]
+    fn app_groups_rpm_and_flatpak_candidates_without_collapsing_identity() {
+        let rpm = id(
+            BackendId::Dnf5,
+            InstallationScope::System,
+            "foo-1.0-1.fc42.x86_64",
+        );
+        let flatpak = id(BackendId::Flatpak, InstallationScope::User, "org.foo.App");
+        let app = AppRecord {
+            id: Some(AppId::new("org.foo.App.desktop")),
+            name: "Foo".to_string(),
+            summary: Some("A foo app".to_string()),
+            description: None,
+            categories: vec!["Utility".to_string()],
+            package_candidates: vec![rpm.clone(), flatpak.clone()],
+        };
+
+        assert_eq!(app.package_candidates, [rpm.clone(), flatpak.clone()]);
+        assert_ne!(app.package_candidates[0], app.package_candidates[1]);
+        assert_ne!(
+            app.package_candidates[0].key(),
+            app.package_candidates[1].key()
+        );
+        assert_eq!(app.id.as_ref().unwrap().as_str(), "org.foo.App.desktop");
+        assert_ne!(app.id.as_ref().unwrap().as_str(), flatpak.native);
+
+        let decoded: AppRecord =
+            serde_json::from_str(&serde_json::to_string(&app).unwrap()).unwrap();
+        assert_eq!(decoded, app);
+        assert_eq!(decoded.package_candidates[0], rpm);
+        assert_eq!(decoded.package_candidates[1], flatpak);
+
+        // One package can be a candidate of several apps: grouping is many-to-many.
+        let other_app = AppRecord {
+            id: None,
+            name: "Foo (system)".to_string(),
+            summary: None,
+            description: None,
+            categories: Vec::new(),
+            package_candidates: vec![rpm.clone()],
+        };
+        assert_eq!(other_app.package_candidates, std::slice::from_ref(&rpm));
+        assert_eq!(app.package_candidates[0], other_app.package_candidates[0]);
+        assert_eq!(rpm.key(), "dnf5:system:foo-1.0-1.fc42.x86_64");
+
+        let encoded = serde_json::to_string(&other_app).unwrap();
+        let decoded: AppRecord = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(decoded.id, None);
+        assert_eq!(decoded.categories, Vec::<String>::new());
+        assert_eq!(decoded.package_candidates, [rpm]);
     }
 }
