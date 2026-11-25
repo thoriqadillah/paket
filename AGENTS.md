@@ -26,7 +26,7 @@ later changes only when their stage starts.
 | Stage D — Host detection and provider registry | `stage-d-host-detection-provider-registry` | S040–S048 | G3 |
 | Stage E — DNF5 provider | `stage-e-dnf5-provider` | S049–S060 | G4 |
 | Stage F — Flatpak provider | `stage-f-flatpak-provider` | S061–S071 | G5 |
-| Stage G — Privileged helper foundation | `stage-g-privileged-helper` | S072–S078 | G6 |
+| Stage G — Kangpaket foundation | `stage-g-privileged-helper` | S072–S078 | G6 |
 | Stage H — APT / dpkg provider | `stage-h-apt-provider` | S079–S090 | G7 |
 | Stage I — Pacman and AUR providers | `stage-i-pacman-aur` | S091–S107 | G8 |
 | Stage J — Zypper and rpm-ostree providers | `stage-j-zypper-rpm-ostree` | S108–S119 | G9 |
@@ -55,5 +55,5 @@ Use the standard prompt in `docs/plan.md` §0.3 when assigning a task.
 - Never commit unless the human asks (plan §0.4).
 - Record factual host/tool/plan mismatches in `docs/deviations.md`. It is not a progress log.
 - Do not expand a task beyond its allowed files. Stop and report blockers.
-- The plan's safety rules always apply: no shell, no arbitrary helper argv, honest plan
+- The plan's safety rules always apply: no shell, no arbitrary privileged argv, honest plan
   previews, no signature bypass, no root for AUR builds.

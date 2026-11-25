@@ -121,7 +121,7 @@ message: `S023: stream child process output`. Do not commit unless the user asks
 | G3 | S040–S048 | Host detection and provider capability registry |
 | G4 | S049–S060 | DNF5 provider with supported read and mutation paths |
 | G5 | S061–S071 | Flatpak provider |
-| G6 | S072–S078 | Typed privileged-helper foundation |
+| G6 | S072–S078 | Typed `kangpaket` foundation |
 | G7 | S079–S090 | APT provider |
 | G8 | S091–S107 | Pacman and opt-in AUR provider |
 | G9 | S108–S119 | Zypper and rpm-ostree providers |
@@ -207,7 +207,7 @@ A release is production-ready only when all of these are true:
 8. Logs, caches, and UI event streams are bounded and do not expose credentials.
 9. Keyboard navigation, focus, screen-reader labels, scaling, translations, and common
    failure dialogs are tested.
-10. Installation packages, helper ownership/permissions, signatures, upgrades, and
+10. Installation packages, kangpaket ownership/permissions, signatures, upgrades, and
     uninstall paths are verified on clean VMs.
 
 ### 1.4 Explicit non-goals
@@ -230,7 +230,7 @@ Do not implement:
 
 | ID | Decision | Reason / qualification |
 |---|---|---|
-| D1 | Project name and binaries are `paket` / `paket-helper` | All Cargo targets, desktop IDs, docs, logs, package names and paths use Paket |
+| D1 | Project name and binaries are `paket` / `kangpaket` | All Cargo targets, desktop IDs, docs, logs, package names and paths use Paket |
 | D2 | Rust 2024 edition | Stable language baseline |
 | D3 | Pin Slint `1.19.0` and Slint Kit `0.9.0` when UI work begins | Current research snapshot; do not follow floating latest versions |
 | D4 | Rust toolchain minimum is `1.95` while using Slint Kit `0.9.0` | Slint Kit currently declares Rust 1.95+ and Slint 1.19.0 |
@@ -244,7 +244,7 @@ Do not implement:
 | D12 | Group same-backend/same-scope intents into one native transaction | One resolver pass is better than one process per clicked package |
 | D13 | Cross-backend batches are sequential and non-atomic | Show partial success explicitly; never promise all-or-nothing across ecosystems |
 | D14 | Read-only discovery can run concurrently with a strict bound | Keep UI responsive without unlimited subprocesses or network calls |
-| D15 | System privilege uses native authorization or a narrow typed helper | DNF5 daemon/polkit, Flatpak's own system helper, snapd, or Paket helper as appropriate |
+| D15 | System privilege uses native authorization or a narrow typed `kangpaket` binary | DNF5 daemon/polkit, Flatpak's own system helper, snapd, or Paket's `kangpaket` as appropriate |
 | D16 | AUR builds always run as the logged-in user | Never run PKGBUILD code as root |
 | D17 | AppImage is a managed local-file provider | No universal repository or update source exists for every AppImage |
 | D18 | SQLite stores Paket state, not package-manager truth | Installed state and dependency resolution must be refreshed from native providers |
@@ -331,7 +331,7 @@ src/
   lib.rs
   main.rs                        # creates Tokio runtime, then runs Slint on main thread
   bin/
-    helper.rs                    # typed privileged helper
+    kangpaket.rs                 # typed privileged binary
   app/
     mod.rs
     coordinator.rs                # application commands and service orchestration
@@ -368,7 +368,7 @@ src/
     flatpak/
     snap/
     appimage/
-  helper/
+  kangpaket/
     mod.rs
     protocol.rs
     client.rs
@@ -440,7 +440,7 @@ loader, custom async-trait framework, DI container, or custom event bus. The sma
 detail, not a new runtime or provider abstraction.
 
 The provider registry is assembled statically at startup. A provider can register read-only
-capabilities even when its mutation service/helper is unavailable.
+capabilities even when its mutation service or kangpaket is unavailable.
 
 ### 3.3 Identity model
 
@@ -526,10 +526,10 @@ confirmation again if the transaction result differs materially from the approve
 ### 3.6 Security boundary
 
 - Only `runtime/process.rs` spawns normal unprivileged commands.
-- Only `paket-helper` spawns privileged package-manager commands.
-- The helper accepts typed operations, never an executable, arbitrary argv, working
+- Only `kangpaket` spawns privileged package-manager commands.
+- Kangpaket accepts typed operations, never an executable, arbitrary argv, working
   directory, environment, or shell string from the GUI.
-- Helper binary must be root-owned, not writable by regular users, installed at a fixed
+- Kangpaket binary must be root-owned, not writable by regular users, installed at a fixed
   absolute path, and invoked through the system's polkit mechanism.
 - Use native polkit integrations when the backend provides them (DNF5 daemon, Flatpak
   system helper, snapd); do not wrap those operations in a second authentication layer.
@@ -552,7 +552,7 @@ matrix. The service is a separate package on Fedora; detect it and report the mi
 capability clearly. If implementing a CLI fallback, keep it a separate tested transport.
 
 DNF4 is a separate future adapter and is not part of the first production support matrix.
-If added later, command syntax, output, machine-readable support, and helper behavior must
+If added later, command syntax, output, machine-readable support, and kangpaket behavior must
 be researched and fixture-tested independently. Do not run DNF4 through DNF5 parsers.
 
 ### 4.2 APT / dpkg
@@ -564,7 +564,7 @@ Treat dpkg lock contention as a normal Busy/Waiting state. Preserve local conffi
 reviewed policy; never silently force overwrite or discard local configuration.
 
 Do not use raw `dpkg -i` as the ordinary installation path. Local `.deb` installs, if later
-supported, go through APT with file validation and a typed helper flow.
+supported, go through APT with file validation and a typed `kangpaket` flow.
 
 ### 4.3 Pacman and AUR
 
@@ -679,10 +679,10 @@ requires proving compatibility with the selected Slint/Kit versions.
 
 **Prerequisite:** S003.
 
-**Allowed files:** `Cargo.toml`, `src/lib.rs`, `src/main.rs`, `src/bin/helper.rs`.
+**Allowed files:** `Cargo.toml`, `src/lib.rs`, `src/main.rs`, `src/bin/kangpaket.rs`.
 
 **Implement:** create one Cargo package named `paket`, one library, GUI binary placeholder,
-and `paket-helper` placeholder. Keep targets compiling. Add only serde, serde_json and
+and `kangpaket` placeholder. Keep targets compiling. Add only serde, serde_json and
 thiserror if the project lacks equivalents.
 
 **Validate:** `cargo check --all-targets`; `cargo test`.
@@ -1037,7 +1037,7 @@ reliable delivery path even when progress is coalesced.
 
 **Implement:** add `tracing` and a subscriber with configurable log levels and rotation or
 bounded size. Redact credential-bearing URLs, authorization data, environment variables,
-and sensitive helper payload fields.
+and sensitive kangpaket payload fields.
 
 **Validate:** tests for redaction and a sample log record.
 
@@ -1608,7 +1608,7 @@ client tests.
 
 **DoD:** UI receives structured transaction progress and final outcome.
 
-**Do not:** add a second Paket root helper path for the same DNF5 operation.
+**Do not:** add a second root `kangpaket` path for the same DNF5 operation.
 
 ---
 
@@ -1787,17 +1787,17 @@ VM run for install/remove/update.
 
 ---
 
-## Stage G — Privileged helper foundation
+## Stage G — Kangpaket foundation
 
-**Gate G6.** The typed privileged-helper boundary is implemented and tested before any
+**Gate G6.** The typed `kangpaket` boundary is implemented and tested before any
 APT, Pacman, Zypper, or rpm-ostree write operation is enabled. Provider-specific command
 builders are still implemented later, one backend at a time.
 
-### S072 — Define the typed helper protocol
+### S072 — Define the typed `kangpaket` protocol
 
 **Prerequisite:** S039.
 
-**Allowed files:** `src/helper/mod.rs`, `src/helper/protocol.rs`, protocol tests.
+**Allowed files:** `src/kangpaket/mod.rs`, `src/kangpaket/protocol.rs`, protocol tests.
 
 **Implement:**
 
@@ -1809,20 +1809,20 @@ builders are still implemented later, one backend at a time.
    directories, shell strings, or caller-selected output paths.
 4. Define bounded JSONL response events: accepted, started, output/progress, completed,
    failed, and cancelled. Use a protocol version and reject unknown versions.
-5. Keep helper protocol types independent from Tokio child-process types.
+5. Keep kangpaket protocol types independent from Tokio child-process types.
 
 **Validate:** JSON round-trip tests, unknown-version/operation tests, and a test proving
 that the request schema cannot represent an executable or arbitrary argument vector.
 
-**DoD:** the helper wire protocol can express only declared package-management operations.
+**DoD:** kangpaket wire protocol can express only declared package-management operations.
 
 **Do not:** implement command execution or any provider-specific command builder yet.
 
-### S073 — Validate helper requests independently
+### S073 — Validate `kangpaket` requests independently
 
 **Prerequisite:** S072.
 
-**Allowed files:** `src/helper/validation.rs`, validation tests.
+**Allowed files:** `src/kangpaket/validation.rs`, validation tests.
 
 **Implement:**
 
@@ -1830,7 +1830,7 @@ that the request schema cannot represent an executable or arbitrary argument vec
    non-empty targets, target count limits, and operation-specific option combinations.
 2. Reject control characters, path traversal, NUL bytes, unexpected option-like values,
    unsupported scopes, and identifiers that fail each backend's documented grammar.
-3. Treat all client-side validation as advisory; repeat validation in the privileged helper.
+3. Treat all client-side validation as advisory; repeat validation inside `kangpaket`.
 4. Bind the request to the authenticated local caller where the platform mechanism exposes
    a trustworthy peer UID. Do not trust a UID field supplied in JSON.
 5. Return stable validation error codes without echoing sensitive request contents.
@@ -1842,16 +1842,16 @@ empty target, and spoofed caller UID tests.
 
 **Do not:** spawn a process or trust UI validation.
 
-### S074 — Add the fixed helper command dispatcher
+### S074 — Add the fixed `kangpaket` command dispatcher
 
 **Prerequisite:** S073.
 
-**Allowed files:** `src/helper/commands/mod.rs`, `src/helper/commands/types.rs`, tests.
+**Allowed files:** `src/kangpaket/commands/mod.rs`, `src/kangpaket/commands/types.rs`, tests.
 
 **Implement:**
 
-1. Define an internal `HelperCommand` containing a fixed absolute executable and structured
-   `OsString` arguments. This type is created only inside the helper process.
+1. Define an internal `KangpaketCommand` containing a fixed absolute executable and structured
+   `OsString` arguments. This type is created only inside the kangpaket process.
 2. Add one explicit dispatcher matching typed protocol operations to backend-specific builder
    functions. A backend operation without an implemented builder returns `Unsupported`.
 3. Do not create a general “run command” operation or a public constructor for arbitrary
@@ -1864,23 +1864,23 @@ empty target, and spoofed caller UID tests.
    without root privileges.
 
 **Validate:** tests for unsupported builder behavior, fixed executable mapping, and proof
-that serialized requests cannot populate `HelperCommand` directly.
+that serialized requests cannot populate `KangpaketCommand` directly.
 
 **DoD:** all privileged process execution must pass through one typed dispatcher; no generic
 root command surface exists.
 
 **Do not:** implement APT/Pacman/Zypper/rpm-ostree command syntax in this task.
 
-### S075 — Implement bounded helper process execution and streaming
+### S075 — Implement bounded kangpaket process execution and streaming
 
 **Prerequisite:** S074.
 
-**Allowed files:** `src/bin/helper.rs`, `src/helper/runner.rs`, helper tests.
+**Allowed files:** `src/bin/kangpaket.rs`, `src/kangpaket/runner.rs`, kangpaket tests.
 
 **Implement:**
 
 1. Read one bounded JSONL request from stdin and reject additional/unbounded payload data.
-2. Convert the validated request to one `HelperCommand` through the dispatcher.
+2. Convert the validated request to one `KangpaketCommand` through the dispatcher.
 3. Spawn only the fixed command via `std::process::Command` with argv arrays; never use a
    shell. Clear the environment and set only the minimal required locale/path variables.
 4. Drain stdout and stderr concurrently; emit bounded JSONL events; cap line length, total
@@ -1891,41 +1891,41 @@ root command surface exists.
 **Validate:** fake-command tests for large output, malformed request, non-zero exit, broken
 pipe, client disconnect, and child reaping.
 
-**DoD:** the helper executes only dispatched operations and cannot be flooded with unbounded
+**DoD:** kangpaket executes only dispatched operations and cannot be flooded with unbounded
 input/output.
 
 **Do not:** add arbitrary command support or provider-specific transaction parsing.
 
-### S076 — Implement the unprivileged helper client
+### S076 — Implement the unprivileged kangpaket client
 
 **Prerequisite:** S075.
 
-**Allowed files:** `src/helper/client.rs`, client tests.
+**Allowed files:** `src/kangpaket/client.rs`, client tests.
 
 **Implement:**
 
-1. Resolve the helper from one compile-time/package-configured absolute path; never search
+1. Resolve kangpaket from one compile-time/package-configured absolute path; never search
    `$PATH` and never accept a path from the UI/request.
-2. Invoke the fixed helper through `pkexec` with no package target in pkexec argv; send the
+2. Invoke `kangpaket` through `pkexec` with no package target in pkexec argv; send the
    typed request through stdin.
 3. Parse bounded versioned JSONL events and classify authorization denied/cancelled,
-   helper unavailable, protocol mismatch, and native operation failure separately.
-4. Support Tokio cancellation without silently dropping the helper child; await/reap it and
+   kangpaket unavailable, protocol mismatch, and native operation failure separately.
+4. Support Tokio cancellation without silently dropping the kangpaket child; await/reap it and
    return the final known state.
 5. Expose a small async client API to provider adapters.
 
-**Validate:** mocked helper success/failure/auth-cancel/protocol-mismatch tests and a test
+**Validate:** mocked kangpaket success/failure/auth-cancel/protocol-mismatch tests and a test
 that no caller-supplied executable path is used.
 
 **DoD:** the application can request only protocol-defined privileged operations.
 
 **Do not:** install permissive polkit rules or grant passwordless access.
 
-### S077 — Define and verify the installed helper path contract
+### S077 — Define and verify the installed kangpaket path contract
 
 **Prerequisite:** S076.
 
-**Allowed files:** `src/helper/client.rs`, `docs/security.md`, path tests.
+**Allowed files:** `src/kangpaket/client.rs`, `docs/security.md`, path tests.
 
 **Implement:**
 
@@ -1934,22 +1934,22 @@ that no caller-supplied executable path is used.
 2. Before invocation, verify the path is absolute and inspect metadata without following
    unexpected symlinks. The final owner/mode check is enforced by packaging and rechecked
    in the release VM task.
-3. Ensure no user-writable directory is used for the production helper binary.
-4. Keep development/test helper paths explicitly separate from production configuration.
+3. Ensure no user-writable directory is used for the production kangpaket binary.
+4. Keep development/test kangpaket paths explicitly separate from production configuration.
 
 **Validate:** tests for relative path rejection, missing path, unexpected symlink, and
 untrusted directory metadata.
 
-**DoD:** production helper resolution is deterministic and cannot fall back to a user-owned
+**DoD:** production kangpaket resolution is deterministic and cannot fall back to a user-owned
 executable found on PATH.
 
-**Do not:** ship a setuid helper or add passwordless polkit policy.
+**Do not:** ship a setuid kangpaket or add passwordless polkit policy.
 
-### S078 — Add helper boundary and adversarial protocol tests
+### S078 — Add kangpaket boundary and adversarial protocol tests
 
 **Prerequisite:** S077.
 
-**Allowed files:** `tests/helper/`, `src/helper/` test-only code, `docs/security.md`.
+**Allowed files:** `tests/kangpaket/`, `src/kangpaket/` test-only code, `docs/security.md`.
 
 **Implement:**
 
@@ -1959,12 +1959,12 @@ executable found on PATH.
    malformed JSONL, output flooding, client disconnect, symlink/path substitution, and
    authorization cancellation.
 3. Assert that no test path can reach a shell or arbitrary executable.
-4. Record the helper trust boundary and remaining provider-specific risks in the security doc.
+4. Record the kangpaket trust boundary and remaining provider-specific risks in the security doc.
 
-**Validate:** `cargo test helper` plus a source scan for shell invocation and unbounded reads.
+**Validate:** `cargo test kangpaket` plus a source scan for shell invocation and unbounded reads.
 
-**DoD:** helper protocol and dispatch boundary are covered by adversarial tests before any
-provider uses the helper.
+**DoD:** kangpaket protocol and dispatch boundary are covered by adversarial tests before any
+provider uses kangpaket.
 
 **Do not:** claim the whole application security review is complete; final threat-model
 review remains in S165.
@@ -2054,10 +2054,10 @@ candidate version, installed version, architecture and repository origin separat
 
 **Prerequisite:** S083, S072–S078.
 
-**Allowed files:** `src/backends/apt/refresh.rs`, `src/helper/commands/apt.rs`, tests.
+**Allowed files:** `src/backends/apt/refresh.rs`, `src/kangpaket/commands/apt.rs`, tests.
 
 **Implement:** add a fixed APT metadata-refresh command builder and execute refresh through
-the typed helper. Parse APT status-FD records where feasible and report repository errors.
+the typed kangpaket. Parse APT status-FD records where feasible and report repository errors.
 Do not refresh automatically on every search or app startup.
 
 **Validate:** VM refresh with working and failing repository fixture.
@@ -2086,7 +2086,7 @@ native source exposes them.
 
 **Prerequisite:** S072–S078, S083.
 
-**Allowed files:** `src/helper/commands/apt.rs`, `src/helper/commands/mod.rs`, tests.
+**Allowed files:** `src/kangpaket/commands/apt.rs`, `src/kangpaket/commands/mod.rs`, tests.
 
 **Implement:** add fixed APT command builders for install/remove/upgrade. Accept only
 validated package IDs and explicit safe operation options; use a fixed `apt-get` executable
@@ -2099,7 +2099,7 @@ and a test for a package name beginning with `-`.
 **DoD:** approved APT operations map to fixed commands and cannot express arbitrary root
 execution.
 
-**Do not:** implement the APT helper process or bypass the native solver.
+**Do not:** implement the `kangpaket` process for APT or bypass the native solver.
 
 ### S087 — Simulate APT install/remove plans
 
@@ -2123,7 +2123,7 @@ simulation fixtures.
 
 **Allowed files:** `src/backends/apt/transaction.rs`.
 
-**Implement:** run approved `apt-get` operations through typed helper. Use `APT::Status-Fd`
+**Implement:** run approved `apt-get` operations through typed `kangpaket`. Use `APT::Status-Fd`
 for machine progress events and bounded diagnostic stderr. Treat conffile decisions as an
 explicit policy, not an implicit overwrite.
 
@@ -2180,7 +2180,7 @@ source review and never runs as root.
 **Implement:** detect pacman version, architecture, pacman.conf path, sync DB state hints,
 and optional pacman-contrib/checkupdates availability.
 
-**Validate:** Arch fixture and missing-helper fixture.
+**Validate:** Arch fixture and missing-kangpaket fixture.
 
 **DoD:** host capability state is precise.
 
@@ -2240,7 +2240,7 @@ Preserve repository and architecture candidate identity.
 database; if unavailable, clearly report update-check limitation rather than running unsafe
 `pacman -Sy` alone. Keep package DB state explicit.
 
-**Validate:** installed, update available, helper missing, DB busy fixtures.
+**Validate:** installed, update available, kangpaket missing, DB busy fixtures.
 
 **DoD:** update listing never creates a partial-upgrade state.
 
@@ -2267,9 +2267,9 @@ and show an explicit full-system-upgrade warning.
 
 **Prerequisite:** S096, S072–S078.
 
-**Allowed files:** `src/backends/pacman/transaction.rs`, `src/helper/commands/pacman.rs`, tests.
+**Allowed files:** `src/backends/pacman/transaction.rs`, `src/kangpaket/commands/pacman.rs`, tests.
 
-**Implement:** run a reviewed full-upgrade operation through typed helper. Ensure confirmation
+**Implement:** run a reviewed full-upgrade operation through typed `kangpaket`. Ensure confirmation
 behavior cannot accept an unreviewed destructive solver change. Use command options only
 after validating supported pacman behavior on target Arch versions.
 
@@ -2283,7 +2283,7 @@ after validating supported pacman behavior on target Arch versions.
 
 **Prerequisite:** S093, S097.
 
-**Allowed files:** `src/backends/pacman/plan.rs`, `src/backends/pacman/transaction.rs`, `src/helper/commands/pacman.rs`, tests.
+**Allowed files:** `src/backends/pacman/plan.rs`, `src/backends/pacman/transaction.rs`, `src/kangpaket/commands/pacman.rs`, tests.
 
 **Implement:** preview reverse dependencies and remove effects; support recursive removal
 only when explicitly reviewed. Keep removal of required packages blocked by native solver.
@@ -2362,7 +2362,7 @@ confirmation before build.
 
 **Allowed files:** `src/backends/aur/build.rs`.
 
-**Implement:** invoke `makepkg` under the logged-in user, never through the root helper;
+**Implement:** invoke `makepkg` under the logged-in user, never through the root kangpaket;
 use an isolated per-build directory, bounded logs, timeout/cancel handling, and a stable
 build environment record. Require user approval for make dependencies.
 
@@ -2391,18 +2391,18 @@ expected package name/version/architecture and checksum. Reject unexpected/missi
 
 **Prerequisite:** S104, S097.
 
-**Allowed files:** `src/backends/aur/transaction.rs`, helper protocol.
+**Allowed files:** `src/backends/aur/transaction.rs`, kangpaket protocol.
 
-**Implement:** stage the artifact safely for the helper (root-owned copy or securely opened
+**Implement:** stage the artifact safely for kangpaket (root-owned copy or securely opened
 file descriptor; never trust a mutable user path after authorization), then install via
 Pacman's native local-package operation while preserving full-upgrade policy and signature
 checks where applicable.
 
 **Validate:** Arch VM install, staged-file replacement race test, invalid package test.
 
-**DoD:** helper cannot be tricked into installing an arbitrary path or changed file.
+**DoD:** `kangpaket` cannot be tricked into installing an arbitrary path or changed file.
 
-**Do not:** let the helper accept any filesystem path from the UI.
+**Do not:** let kangpaket accept any filesystem path from the UI.
 
 ### S106 — Add AUR build and install contract tests
 
@@ -2505,9 +2505,9 @@ or vendor-change options without a separate explicit user policy.
 
 **Prerequisite:** S111, S072–S078.
 
-**Allowed files:** `src/backends/zypper/transaction.rs`, `src/helper/commands/zypper.rs`, tests.
+**Allowed files:** `src/backends/zypper/transaction.rs`, `src/kangpaket/commands/zypper.rs`, tests.
 
-**Implement:** typed helper install/remove/update with verified noninteractive behavior only
+**Implement:** typed `kangpaket` install/remove/update with verified noninteractive behavior only
 after preview review; stream progress; capture exit state and repository failures.
 
 **Validate:** openSUSE VM transaction tests and lock contention.
@@ -2594,7 +2594,7 @@ reboot-required effect. If operations are chainable, show the combined pending s
 
 **Prerequisite:** S117, S072–S078.
 
-**Allowed files:** `src/backends/rpm_ostree/transaction.rs`, `src/helper/commands/rpm_ostree.rs`, tests.
+**Allowed files:** `src/backends/rpm_ostree/transaction.rs`, `src/kangpaket/commands/rpm_ostree.rs`, tests.
 
 **Implement:** run approved `rpm-ostree` operations through the supported authorization
 path; reconcile pending deployment after completion.
@@ -3284,7 +3284,7 @@ upgrade/uninstall, and operational documentation.
 **Allowed files:** `fuzz/`, parser tests.
 
 **Implement:** fuzz pure parsers for JSON, delimited output, os-release, Flatpak refs,
-APT records, Pacman, AUR responses, AppStream XML and helper protocol.
+APT records, Pacman, AUR responses, AppStream XML and kangpaket protocol.
 
 **Validate:** bounded fuzz smoke run in CI/nightly.
 
@@ -3347,14 +3347,14 @@ and QA tasks S161–S164.
 **Allowed files:** `docs/security.md`, security tests, narrowly scoped fixes in reviewed
 security-sensitive modules.
 
-**Implement:** review command injection, helper authorization, path races, symlinks,
+**Implement:** review command injection, kangpaket authorization, path races, symlinks,
 environment leakage, credential redaction, untrusted package metadata, AUR build scripts,
 AppImage import/launch, stale plans, transaction cancellation, crash recovery, and cache
 poisoning. Verify every privileged operation has an explicit allowlist and native identity
 validation. Record mitigations, evidence, and accepted residual risks.
 
 **Validate:** complete threat-model checklist, adversarial test suite, and second-person
-review of the helper boundary.
+review of the kangpaket boundary.
 
 **DoD:** every privileged or untrusted-input boundary is documented and has corresponding
 tests; unresolved critical/high findings block release.
@@ -3368,13 +3368,13 @@ tests; unresolved critical/high findings block release.
 **Allowed files:** native packaging files under `packaging/`, desktop/metainfo resources.
 
 **Implement:** create native RPM/DEB/Arch packages for qualified targets; include binary,
-helper path, desktop entry, icons, metainfo, docs, and correct runtime dependencies. Treat
+kangpaket path, desktop entry, icons, metainfo, docs, and correct runtime dependencies. Treat
 Flatpak packaging of Paket itself as a separate future effort because sandbox access to host
 package tools/system services requires a deliberate host integration design.
 
-**Validate:** install/upgrade/downgrade/uninstall on clean VMs and verify helper owner/mode.
+**Validate:** install/upgrade/downgrade/uninstall on clean VMs and verify kangpaket owner/mode.
 
-**DoD:** package lifecycle leaves no broken helper or stale desktop integration.
+**DoD:** package lifecycle leaves no broken kangpaket or stale desktop integration.
 
 **Do not:** rely only on `cargo run` for production validation.
 
@@ -3386,7 +3386,7 @@ package tools/system services requires a deliberate host integration design.
 
 **Implement:** CI for fmt/test/clippy/fuzz smoke/dependency audit; release artifacts per
 qualified distro; generate checksums and sign artifacts; publish SBOM; document supported
-versions, limitations, data handling, logs, helper authorization, update policy, AUR/AppImage
+versions, limitations, data handling, logs, kangpaket authorization, update policy, AUR/AppImage
 risks, and known issues. Tag only after all release gates pass.
 
 **Validate:** reproduce release build from clean runner and verify signatures/checksums.
@@ -3440,7 +3440,7 @@ is active. Ensure the native child is awaited/reaped.
 ### 6.5 Security tests
 
 Test no shell invocation, fixed executable allowlists, package ID validation in both user
-process and helper, root-owned helper path, request size caps, path traversal, symlink races,
+process and kangpaket, root-owned kangpaket path, request size caps, path traversal, symlink races,
 credential redaction, signature failure, untrusted AppImage import, and AUR review gate.
 
 ### 6.6 Required commands at every gate
@@ -3558,7 +3558,7 @@ against the minimum versions Paket chooses to support.
 - rpm-ostree package layering creates a pending deployment and normally takes effect after
   reboot; it must have its own state model/provider.
 - `pkexec` runs a specified program as root using a polkit authorization path and does not
-  validate arguments itself. The helper must validate its own typed requests and be installed
+  validate arguments itself. Kangpaket must validate its own typed requests and be installed
   in a root-owned, non-user-writable location.
 
 ## Appendix B — Source references

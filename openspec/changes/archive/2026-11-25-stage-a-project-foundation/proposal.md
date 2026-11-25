@@ -13,7 +13,7 @@ inventing identity, metadata, capability or transaction shapes ad hoc.
 - Record the repository/toolchain/host baseline (S001).
 - Lock naming and licensing, including the Slint Kit GPL compatibility decision (S002).
 - Pin edition 2024, `rust-version = "1.95"` and the CI toolchain channel (S003).
-- Complete the `paket` library, GUI placeholder and `paket-helper` targets (S004).
+- Complete the `paket` library, GUI placeholder and `kangpaket` targets (S004).
 - Adopt rustfmt and warnings-denied clippy as the local baseline (S005).
 - Add typed catalog, plan and operation error families (S006).
 - Add backend/package identity with installation scope and `SourceId` (S007).
@@ -43,7 +43,7 @@ None.
 
 ## Impact
 
-- `Cargo.toml`, `rust-toolchain.toml`, `src/main.rs`, `src/lib.rs`, `src/bin/helper.rs`.
+- `Cargo.toml`, `rust-toolchain.toml`, `src/main.rs`, `src/lib.rs`, `src/bin/kangpaket.rs`.
 - New `src/core/` modules for errors, IDs, packages, capabilities and transactions.
 - Existing `src/core/model.rs` is partial and will be completed/renamed by S007–S011.
 - Dependencies: `serde` (derive), `serde_json`, `thiserror`. No Tokio, Slint or backend

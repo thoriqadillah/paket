@@ -68,7 +68,7 @@ None for S001. A later task can create the Cargo package on this host.
 ### Correction (2026-11-24, S002–S003 verification)
 
 The layout and validation sections above were stale: `Cargo.toml`, `Cargo.lock`, `src/lib.rs`,
-`src/bin/helper.rs` and `src/core/model.rs` already existed when S001 was recorded. Current
+`src/bin/kangpaket.rs` and `src/core/model.rs` already existed when S001 was recorded. Current
 state: one `paket` package (edition 2024, `rust-version` raised from 1.85 to 1.95 in S003),
 `serde`/`serde_json`/`thiserror` only, no `src/main.rs`, no `tests/` directory and no CI.
 With the S003 pin (`rust-toolchain.toml`, channel 1.95.0), `cargo check`, `cargo test`

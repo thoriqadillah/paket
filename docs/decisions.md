@@ -6,7 +6,7 @@ any UI or packaging work starts. It is a decision record, not a progress log.
 ## Naming
 
 - Project name: **Paket** (plan D1).
-- Binaries: `paket` (GUI) and `paket-helper` (typed privileged helper).
+- Binaries: `paket` (GUI) and `kangpaket` (typed privileged binary).
 - The Cargo package is `paket`; libraries, desktop entries, documentation, logs and package
   names use the same name. No second product name is introduced.
 - D-Bus, desktop and reverse-DNS application IDs are not defined yet. They must be chosen
@@ -16,7 +16,7 @@ any UI or packaging work starts. It is a decision record, not a progress log.
 
 - Primary distribution is native OS packages per qualified target (RPM, DEB, Arch), built
   in S166. `cargo run` is not a supported production delivery path.
-- `paket-helper` ships inside the same native package, installed at a fixed absolute path,
+- `kangpaket` ships inside the same native package, installed at a fixed absolute path,
   root-owned and not writable by regular users.
 - Flatpak packaging of Paket itself is out of scope until a host-integration design exists,
   because the sandbox must reach host package tools and system services.

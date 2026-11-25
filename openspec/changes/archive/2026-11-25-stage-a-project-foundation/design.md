@@ -4,7 +4,7 @@
 
 The repository is no longer empty: S001 produced `docs/baseline.md`, and the package already
 has `Cargo.toml` (edition 2024, `rust-version = 1.85`), `src/lib.rs`,
-`src/bin/helper.rs`, `src/core/model.rs` with `BackendId`/`PkgId`, and the
+`src/bin/kangpaket.rs`, `src/core/model.rs` with `BackendId`/`PkgId`, and the
 `serde`/`serde_json`/`thiserror` dependencies. The production plan adds S002–S012, so
 existing work is partial and must be completed rather than re-scaffolded. See
 `proposal.md` for motivation.
@@ -12,7 +12,7 @@ existing work is partial and must be completed rather than re-scaffolded. See
 ## Goals / Non-Goals
 
 **Goals:**
-- A reproducible toolchain, GUI/helper targets and a repeatable lint baseline.
+- A reproducible toolchain, GUI/kangpaket targets and a repeatable lint baseline.
 - One small `src/core/` module tree owning identity, scopes, catalog records, application
   grouping, backend capabilities and transaction shapes, reused by every later stage.
 - Native identifiers opaque in core; display names never used as mutation identity.
@@ -29,7 +29,7 @@ existing work is partial and must be completed rather than re-scaffolded. See
 - **Toolchain:** edition 2024, `rust-version = "1.95"` while Slint Kit 0.9.0 is selected, and
   `rust-toolchain.toml` pinning the CI channel. Host toolchain is 1.97; keep code free of
   newer-only syntax.
-- **Targets:** one library, a GUI placeholder at `src/main.rs`, and the `paket-helper`
+- **Targets:** one library, a GUI placeholder at `src/main.rs`, and the `kangpaket`
   placeholder. No Slint dependency yet.
 - **Policy:** standard rustfmt, no broad allowlists, clippy warnings denied in CI.
 - **Errors:** `CatalogError`, `PlanError` and `OperationError` as `thiserror` enums. Native
