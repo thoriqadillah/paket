@@ -7,7 +7,7 @@ dependencies — so every task below is unchecked. One task is implemented per a
 
 ## 1. Runtime foundation
 
-- [ ] S013 Add Tokio 1.54.1 with only the needed features (`rt-multi-thread`, `macros`,
+- [x] S013 Add Tokio 1.54.1 with only the needed features (`rt-multi-thread`, `macros`,
   `process`, `time`, `sync`, `io-util`, `fs`, `signal` where supported) to `Cargo.toml`;
   verify `cargo tree -e features` shows exactly the enabled features and
   `cargo check --all-targets` passes.

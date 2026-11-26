@@ -16,3 +16,4 @@ path = "src/bin/kangpaket.rs"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
+tokio = { version = "=1.54.1", default-features = false, features = ["rt-multi-thread", "macros", "process", "time", "sync", "io-util", "fs", "signal"] }
